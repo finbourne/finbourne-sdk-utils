@@ -1,0 +1,23 @@
+urllib3>=1.26.9
+requests>=2.27.1
+
+coloredlogs>=14.0
+detect_delimiter>=0.1
+flatten-json>=0.1.7
+pandas>=1.1.4
+PyYAML>=5.4
+tqdm>=4.52.0
+openpyxl>=3.0.7
+xlrd~=1.2
+pytz>=2019.3
+
+IPython>=7.31.1
+pathlib
+
+lusidfeature
+
+# Finbourne stuff
+finbourne-access-sdk > 2
+finbourne-identity-sdk > 2
+lusid-sdk > 2
+lusid-configuration-sdk > 2

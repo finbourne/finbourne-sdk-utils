@@ -1,0 +1,5 @@
+#!/usr/bin/python3
+
+import lusidtools.lpt.dfq as dfq
+
+dfq.main()
