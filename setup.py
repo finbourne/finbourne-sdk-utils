@@ -5,14 +5,14 @@ with open("./__version__.py") as fp:
     exec(fp.read(), version)
 
 setup(
-    name="lusidtools",
+    name="finbourne-sdk-utils",
     version=version["__version__"],
-    description="Python Tools for LUSID",
-    url="https://github.com/finbourne/lusid-python-tools",
+    description="Python utilities for working with the LUSID SDK",
+    url="https://github.com/finbourne/finbourne-sdk-utils",
     author="FINBOURNE Technology",
     author_email="engineering@finbourne.com",
     license="MIT",
-    keywords=["FINBOURNE", "LUSID", "LUSID API", "python"],
+    keywords=["FINBOURNE", "LUSID", "LUSID SDK", "python"],
     packages=find_packages(exclude=["tests*"]),
     install_requires=[
         "urllib3>=1.26.9",
@@ -27,7 +27,7 @@ setup(
         "xlrd~=1.2",
         "pytz>=2019.3",
         "IPython>=7.31.1",
-        "lusid-sdk-preview>=0.11.4425, < 2",
+        "lusid-sdk>=2",
     ],
     include_package_data=True,
     python_requires=">=3.7",
