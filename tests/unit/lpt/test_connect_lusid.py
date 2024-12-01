@@ -1,7 +1,7 @@
 import unittest
 from unittest import mock
 import os
-from lusidtools.lpt import connect_lusid
+from finbourne_sdk_utils.lpt import connect_lusid
 
 
 class ConnectLusidTests(unittest.TestCase):

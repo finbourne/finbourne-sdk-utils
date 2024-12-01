@@ -3,10 +3,10 @@ import unittest
 from pathlib import Path
 import pandas as pd
 
-from lusidtools import cocoon as cocoon
+from finbourne_sdk_utils import cocoon as cocoon
 from parameterized import parameterized
 import lusid
-from lusidtools import logger
+from finbourne_sdk_utils import logger
 import numpy as np
 import concurrent.futures
 

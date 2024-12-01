@@ -3,8 +3,8 @@ from pathlib import Path
 import lusid
 import lusid.models as models
 
-from lusidtools.cocoon.utilities import create_scope_id
-from lusidtools.cocoon.transaction_type_upload import upsert_transaction_type_alias
+from finbourne_sdk_utils.cocoon.utilities import create_scope_id
+from finbourne_sdk_utils.cocoon.transaction_type_upload import upsert_transaction_type_alias
 import logging
 import json
 from copy import deepcopy

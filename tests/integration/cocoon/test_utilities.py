@@ -1,8 +1,8 @@
 import os
 import unittest
-import lusidtools.cocoon as cocoon
+import finbourne_sdk_utils.cocoon as cocoon
 from parameterized import parameterized
-from lusidtools import logger
+from finbourne_sdk_utils import logger
 
 
 class CocoonUtilitiesTests(unittest.TestCase):

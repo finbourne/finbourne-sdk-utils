@@ -41,7 +41,7 @@ Reason, rework of the ApiClientFactory means the configuration isn't available, 
 
 Previously all API DTO ( models classes ) were herited from Object, but now we use pydantic's BaseModel.
 1. This allows easier type checking and enumeration using pydantic. This change enforces better type checking at run time. Notable is the type checking on each property such as min max length of a string. Floats and integers can not be string representations in V2, i.e. code can not rely on implicit type conversions 
-2. The DTO do not have the properties openapi_types , attribute_map and required_map.  attribute_map has a equivalent __properties. These are not available and are now discovered at runtime. See the  get_attributes_and_types() within lusidtools.cocoon namespace.
+2. The DTO do not have the properties openapi_types , attribute_map and required_map.  attribute_map has a equivalent __properties. These are not available and are now discovered at runtime. See the  get_attributes_and_types() within finbourne_sdk_utils.cocoon namespace.
 3. Each DTO has a Config property, a pydantic configuration technique ( todo concorse ?)
 4. Default constructor now expects **kwargs or named parameters. see https://docs.pydantic.dev/1.10/#__tabbed_1_3.
 

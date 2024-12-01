@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pandas
 
-import lusidtools.lpt.dfq as dfq
+import finbourne_sdk_utils.lpt.dfq as dfq
 from pandas.testing import assert_frame_equal
 
 

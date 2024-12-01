@@ -5,9 +5,9 @@ import pandas as pd
 import lusid
 
 
-from lusidtools import cocoon as cocoon
-from lusidtools import logger
-from lusidtools.cocoon.utilities import create_scope_id
+from finbourne_sdk_utils import cocoon as cocoon
+from finbourne_sdk_utils import logger
+from finbourne_sdk_utils.cocoon.utilities import create_scope_id
 from parameterized import parameterized
 
 

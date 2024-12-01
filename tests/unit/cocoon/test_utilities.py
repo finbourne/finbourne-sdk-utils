@@ -14,8 +14,8 @@ import pandas as pd
 from pandas.testing import assert_frame_equal
 import pytz
 from parameterized import parameterized
-from lusidtools import cocoon
-from lusidtools.cocoon.utilities import (
+from finbourne_sdk_utils import cocoon
+from finbourne_sdk_utils.cocoon.utilities import (
     checkargs,
     get_delimiter,
     check_mapping_fields_exist,
@@ -28,7 +28,7 @@ from lusidtools.cocoon.utilities import (
     extract_unique_portfolio_codes,
     extract_unique_portfolio_codes_effective_at_tuples,
 )
-from lusidtools import logger
+from finbourne_sdk_utils import logger
 import lusid.models as models
 
 

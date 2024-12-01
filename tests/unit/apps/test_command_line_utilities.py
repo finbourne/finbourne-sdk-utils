@@ -2,10 +2,10 @@ import os
 import unittest
 from parameterized import parameterized
 from pathlib import Path
-from lusidtools.logger import LusidLogger
-from lusidtools.cocoon import load_data_to_df_and_detect_delimiter, parse_args
+from finbourne_sdk_utils.logger import LusidLogger
+from finbourne_sdk_utils.cocoon import load_data_to_df_and_detect_delimiter, parse_args
 from tests.unit.apps.test_data import test_transactions as flush_test_data
-import lusidtools.apps.flush_transactions as flush
+import finbourne_sdk_utils.apps.flush_transactions as flush
 import lusid
 import datetime
 from dateutil.tz import tzutc

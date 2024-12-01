@@ -1,0 +1,455 @@
+import pandas as pd
+import numpy as np
+from finbourne_sdk_utils.cocoon import checkargs
+from lusid.exceptions import ApiException
+from flatten_json import flatten
+
+
+class CocoonPrinter:
+    VALID_KEYS = [
+        "portfolios",
+        "instruments",
+        "transactions",
+        "quotes",
+        "holdings",
+        "reference_portfolios",
+    ]
+
+    def __init__(
+        self, response, extended_error_details=False, data_entity_details=False
+    ):
+        self.validate(response)
+
+        self.response = response
+        self.file_type = list(response.keys())[0]
+        self.extended_error_details = extended_error_details
+        self.data_entity_details = data_entity_details
+
+    def validate(self, response):
+        if len(response.keys()) == 0:
+            message = (
+                f"Response doesn't contain any keys. Valid keys are {self.VALID_KEYS}"
+            )
+            raise ValueError(message)
+
+        if len(response.keys()) > 1:
+            message = f"Response contains too many keys - only one is allowed, but received {list(response.keys())}"
+            raise ValueError(message)
+
+        key = list(response.keys())[0]
+
+        if key not in self.VALID_KEYS:
+            message = f"Response contains invalid key. Valid keys are {self.VALID_KEYS}, but received {key}"
+            raise ValueError(message)
+
+    def format_instruments_response(self):
+        return format_instruments_response(
+            self.response,
+            extended_error_details=self.extended_error_details,
+            data_entity_details=self.data_entity_details,
+        )
+
+    def format_portfolios_response(self):
+        return format_portfolios_response(
+            self.response, extended_error_details=self.extended_error_details
+        )
+
+    def format_transactions_response(self):
+        return format_transactions_response(
+            self.response, extended_error_details=self.extended_error_details
+        )
+
+    def format_quotes_response(self):
+        return format_quotes_response(
+            self.response, extended_error_details=self.extended_error_details,
+        )
+
+    def format_holdings_response(self):
+        return format_holdings_response(
+            self.response, extended_error_details=self.extended_error_details,
+        )
+
+    def format_reference_portfolios_response(self):
+        return format_reference_portfolios_response(
+            self.response, extended_error_details=self.extended_error_details,
+        )
+
+    def format_response(self):
+        return getattr(CocoonPrinter, f"format_{self.file_type}_response")(self)
+
+
+@checkargs
+def check_dict_for_required_keys(
+    target_dict: dict, target_name: str, required_keys: list
+):
+    """
+    This function checks that a named dictionary contains a list of required key
+
+    Parameters
+    ----------
+    target_dict : dict
+        Dictionary to check for keys in
+    target_name : str
+        Variable name of dictionary
+    required_keys : list
+        List of required keys
+
+    Returns
+    -------
+    None
+    """
+
+    for key in required_keys:
+        if key not in target_dict.keys():
+            raise ValueError(
+                f"'{key}' missing from {target_name}. {target_name} must include {required_keys}"
+                f"as keys"
+            )
+
+
+def get_errors_from_response(
+    list_of_API_exceptions: list, extended_error_details: bool = False
+):
+    """
+    This function gets the status code and reason from API exception
+
+    Parameters
+    ----------
+    list_of_API_exceptions : list
+        A list of ApiExceptions
+    extended_error_details : bool
+        A flag that determines whether the errors returned will have extended details (request id, error body)
+    Returns
+    -------
+    pd.DataFrame
+        A Pandas DataFrame containing the reasons and status codes for ApiExceptions from a request.
+        If the extended_error_details bool is True, the RequestID and error body will also be returned.
+    """
+
+    # check all items are ApiExceptions
+    for i in list_of_API_exceptions:
+        if not isinstance(i, ApiException):
+            raise TypeError(
+                f" Unexpected Error in response. Expected instance of ApiException, but got: {repr(i)}"
+            )
+
+    # get status and reason for each batch
+    status = [item.status for item in list_of_API_exceptions]
+    reason = [item.reason for item in list_of_API_exceptions]
+
+    items_list = [reason, status]
+    column_names = ["error_items", "status"]
+
+    if extended_error_details:
+        request_id = [
+            item.headers.get("lusid-meta-requestId") for item in list_of_API_exceptions
+        ]
+        error_body = [item.body for item in list_of_API_exceptions]
+        items_list.extend([request_id, error_body])
+        column_names.extend(["request_id", "error_body"])
+
+    # transpose list of lists for insertion to dataframe
+    items_error = np.array(items_list).T.tolist()
+
+    return pd.DataFrame(items_error, columns=column_names)
+
+
+def get_portfolio_from_href(href: list, file_type: str):
+    """
+    This function finds the protfolio code contained within a href for a given file_type
+
+    Parameters
+    ----------
+    href : list
+        list of hrefs from LUSID response
+    file_type : str
+
+    Returns
+    -------
+    list
+        portfolio codes taken from hrefs
+    """
+
+    # get portfolio codes from each href
+    codes = [j[-2] for j in [i.split("/") for i in href]]
+
+    return codes
+
+
+@checkargs
+def get_non_href_response(response: dict, file_type: str, data_entity_details=False):
+    dict_items_success = [
+        (key, value)
+        for batch in response[file_type]["success"]
+        for (key, value) in batch.values.items()
+    ]
+    dict_items_failed = [
+        (key, value)
+        for batch in response[file_type]["success"]
+        for (key, value) in batch.failed.items()
+    ]
+
+    def extract_value_details_from_success_request(data_entity_dict):
+        return pd.DataFrame(
+            flatten(value[1].to_dict(), ".") for value in data_entity_dict
+        )
+
+    def extract_key_details_from_success_request(data_entity_dict):
+        return pd.DataFrame(value[0] for value in data_entity_dict)
+
+    if data_entity_details:
+
+        return (
+            extract_value_details_from_success_request(dict_items_success),
+            extract_value_details_from_success_request(dict_items_failed),
+        )
+
+    else:
+
+        return (
+            extract_key_details_from_success_request(dict_items_success),
+            extract_key_details_from_success_request(dict_items_failed),
+        )
+
+
+def format_instruments_response(
+    response: dict,
+    extended_error_details: bool = False,
+    data_entity_details: bool = False,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    This function unpacks a response from instrument requests and returns successful, failed and errored statuses for
+    request constituents.
+    Parameters
+    ----------
+    response : dict
+        response from Lusid-python-tools
+    extended_error_details : bool
+        A flag that determines whether the errors returned will have extended details (request id, error body)
+    data_entity_details : bool
+        A flag that determines whether the fields from the response will all be extracted
+    Returns
+    -------
+    success : pd.DataFrame
+         successful calls from request
+    error : pd.DataFrame
+        Error responses from request that fail (APIExceptions: 400 errors)
+    fail : pd.Dataframe
+        Failed responses that LUSID rejected
+    """
+
+    file_type = "instruments"
+    check_dict_for_required_keys(
+        response[file_type], f"Response from {file_type} request", ["errors", "success"]
+    )
+
+    # get success and failures
+    items_success, items_failed = get_non_href_response(
+        response, file_type, data_entity_details
+    )
+
+    return (
+        items_success,
+        get_errors_from_response(response[file_type]["errors"], extended_error_details),
+        items_failed,
+    )
+
+
+def format_portfolios_response(
+    response: dict, extended_error_details: bool = False,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    This function unpacks a response from portfolio requests and returns successful and errored statuses for
+    request constituents.
+
+    Parameters
+    ----------
+    response : dict
+        response from Lusid-python-tools
+    extended_error_details : bool
+        A flag that determines whether the errors returned will have extended details (request id, error body)
+
+    Returns
+    -------
+    success : pd.DataFrame
+         successful calls from request
+    error : pd.DataFrame
+        Error responses from request that fail (APIExceptions: 400 errors)
+    """
+    file_type = "portfolios"
+    check_dict_for_required_keys(
+        response[file_type], f"Response from {file_type} request", ["errors", "success"]
+    )
+
+    # get success
+    items_success = [batch.id.code for batch in response[file_type]["success"]]
+
+    errors = get_errors_from_response(
+        response[file_type]["errors"], extended_error_details
+    )
+
+    return (pd.DataFrame(items_success, columns=["successful items"]), errors)
+
+
+def format_transactions_response(
+    response: dict, extended_error_details: bool = False,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    This function unpacks a response from transaction requests and returns successful and errored statuses for
+    request constituents.
+
+    Parameters
+    ----------
+    response : dict
+        response from Lusid-python-tools
+    extended_error_details : bool
+        A flag that determines whether the errors returned will have extended details (request id, error body)
+
+    Returns
+    -------
+    success : pd.DataFrame
+         successful calls from request
+    error : pd.DataFrame
+        Error responses from request that fail (APIExceptions: 400 errors)
+    """
+
+    file_type = "transactions"
+
+    check_dict_for_required_keys(
+        response[file_type], f"Response from {file_type} request", ["errors", "success"]
+    )
+
+    # get success
+    items_success = [batch.href for batch in response[file_type]["success"]]
+
+    errors = get_errors_from_response(
+        response[file_type]["errors"], extended_error_details
+    )
+
+    return (
+        pd.DataFrame(
+            get_portfolio_from_href(items_success, file_type),
+            columns=["successful items"],
+        ),
+        errors,
+    )
+
+
+def format_holdings_response(
+    response: dict, extended_error_details: bool = False,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    This function unpacks a response from holding requests and returns successful and errored statuses for
+    request constituents.
+
+    Parameters
+    ----------
+    response : dict
+        response from Lusid-python-tools
+    extended_error_details : bool
+        A flag that determines whether the errors returned will have extended details (request id, error body)
+
+    Returns
+    -------
+    success : pd.DataFrame
+         successful calls from request
+    error : pd.DataFrame
+        Error responses from request that fail (APIExceptions: 400 errors)
+
+    """
+
+    file_type = "holdings"
+    check_dict_for_required_keys(
+        response[file_type], f"Response from {file_type} request", ["errors", "success"]
+    )
+
+    # get success
+    items_success = [batch.href for batch in response[file_type]["success"]]
+
+    errors = get_errors_from_response(
+        response[file_type]["errors"], extended_error_details
+    )
+
+    return (
+        pd.DataFrame(
+            get_portfolio_from_href(items_success, file_type),
+            columns=["successful items"],
+        ),
+        errors,
+    )
+
+
+def format_quotes_response(
+    response: dict, extended_error_details: bool = False,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    This function unpacks a response from quotes requests and returns successful, failed and errored statuses for
+    request constituents.
+
+    Parameters
+    ----------
+    response : dict
+        response from Lusid-python-tools
+    extended_error_details : bool
+        A flag that determines whether the errors returned will have extended details (request id, error body)
+
+    Returns
+    -------
+    success : pd.DataFrame
+         successful calls from request
+    error : pd.DataFrame
+        Error responses from request that fail (APIExceptions: 400 errors)
+    fail : pd.Dataframe
+        Failed responses that LUSID rejected
+    """
+
+    file_type = "quotes"
+
+    check_dict_for_required_keys(
+        response[file_type], f"Response from {file_type} request", ["errors", "success"]
+    )
+    items_success, items_failed = get_non_href_response(
+        response, file_type, data_entity_details=True
+    )
+
+    return (
+        items_success,
+        get_errors_from_response(response[file_type]["errors"], extended_error_details),
+        items_failed,
+    )
+
+
+def format_reference_portfolios_response(
+    response: dict, extended_error_details: bool = False,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    This function unpacks a response from reference portfolio requests and returns successful and errored statuses for request constituents.
+
+    Parameters
+    ----------
+    response : dict
+        response from Lusid-python-tools
+    extended_error_details : bool
+        A flag that determines whether the errors returned will have extended details (request id, error body)
+
+    Returns
+    -------
+    success : pd.DataFrame
+        successful calls from request
+    error : pd.DataFrame
+        Error responses from rquest that fail (APIExceptions: 400 errors)
+    """
+
+    file_type = "reference_portfolios"
+    check_dict_for_required_keys(
+        response[file_type], f"Response from {file_type} request", ["errors", "success"]
+    )
+
+    # get success
+    items_success = [batch.id.code for batch in response[file_type]["success"]]
+
+    errors = get_errors_from_response(
+        response[file_type]["errors"], extended_error_details
+    )
+
+    return (pd.DataFrame(items_success, columns=["successful items"]), errors)

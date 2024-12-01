@@ -33,13 +33,13 @@ setup(
     python_requires=">=3.7",
     entry_points={
         "console_scripts": [
-            "upsert_portfolios=lusidtools.apps.upsert_portfolios:main",
-            "lusidtools=lusidtools.commands.commands:main",
-            "upsert_instruments=lusidtools.apps.upsert_instruments:main",
-            "upsert_holdings=lusidtools.apps.upsert_holdings:main",
-            "upsert_quotes=lusidtools.apps.upsert_quotes:main",
-            "upsert_transactions=lusidtools.apps.upsert_transactions:main",
-            "flush_transactions=lusidtools.apps.flush_transactions:main",
+            "upsert_portfolios=finbourne_sdk_utils.apps.upsert_portfolios:main",
+            "finbourne_sdk_utils=finbourne_sdk_utils.commands.commands:main",
+            "upsert_instruments=finbourne_sdk_utils.apps.upsert_instruments:main",
+            "upsert_holdings=finbourne_sdk_utils.apps.upsert_holdings:main",
+            "upsert_quotes=finbourne_sdk_utils.apps.upsert_quotes:main",
+            "upsert_transactions=finbourne_sdk_utils.apps.upsert_transactions:main",
+            "flush_transactions=finbourne_sdk_utils.apps.flush_transactions:main",
         ],
     },
 )

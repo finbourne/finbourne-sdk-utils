@@ -3,10 +3,10 @@ import unittest
 from parameterized import parameterized
 import lusid
 from pathlib import Path
-import lusidtools.cocoon as cocoon
+import finbourne_sdk_utils.cocoon as cocoon
 import pandas as pd
 import numpy as np
-from lusidtools import logger
+from finbourne_sdk_utils import logger
 from .mock_api_factory import MockApiFactory
 
 

@@ -4,9 +4,9 @@ from pathlib import Path
 import lusid
 import lusid.models as models
 
-from lusidtools import logger
-from lusidtools.cocoon.utilities import create_scope_id
-from lusidtools.cocoon.transaction_type_upload import (
+from finbourne_sdk_utils import logger
+from finbourne_sdk_utils.cocoon.utilities import create_scope_id
+from finbourne_sdk_utils.cocoon.transaction_type_upload import (
     create_transaction_type_configuration,
 )
 

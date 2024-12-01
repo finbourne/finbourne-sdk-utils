@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from parameterized import parameterized
 
-from lusidtools.lpt import lpt
+from finbourne_sdk_utils.lpt import lpt
 
 
 class LptTests(unittest.TestCase):

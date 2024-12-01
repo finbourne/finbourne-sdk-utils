@@ -1,0 +1,21 @@
+#!/usr/bin/python3
+
+import pandas as pd
+from finbourne_sdk_utils.lpt import stdargs
+from finbourne_sdk_utils.lpt import lse
+from finbourne_sdk_utils.lpt import lpt
+
+args = (stdargs.Parser('identifier update',['scope','portfolio'])
+        .add('ids',nargs='+')
+        .parse())
+
+api = lse.connect(args)
+
+api.call.cancel_transactions(
+       scope=args.scope,
+       code=args.portfolio,
+       transaction_ids = args.ids
+).match(
+   left=lpt.display_error,
+   right=lambda r : print (r)
+)

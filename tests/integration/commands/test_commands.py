@@ -6,25 +6,25 @@ import pandas as pd
 from pathlib import Path
 
 # Import modules for testing
-import lusidtools.lpt.qry_scopes as scopes
-import lusidtools.lpt.qry_aggregate_holdings as agg
-import lusidtools.lpt.qry_portfolios as portfolios
-import lusidtools.lpt.get_instruments as get_instruments
-import lusidtools.lpt.qry_portfolio_groups as list_portfolio_group
-import lusidtools.lpt.qry_portfolio_properties as get_port_props
-import lusidtools.lpt.qry_properties as get_props
-import lusidtools.lpt.qry_constituents as get_port_cons
-import lusidtools.lpt.qry_holdings as get_port_holdings
-import lusidtools.lpt.qry_instr_ids as get_instr_id_types
-import lusidtools.lpt.qry_instruments as list_instruments
-import lusidtools.lpt.qry_portfolio_commands as get_port_commands
-import lusidtools.lpt.qry_target_holdings as get_holdings_adj
-import lusidtools.lpt.qry_transactions as get_transactions
-import lusidtools.lpt.search_instruments as search_instruments
-import lusidtools.lpt.create_group_portfolios as cgp
-import lusidtools.lpt.upload_portfolio as up
-import lusidtools.lpt.upload_quotes as uq
-import lusidtools.lpt.txn_config as txn
+import finbourne_sdk_utils.lpt.qry_scopes as scopes
+import finbourne_sdk_utils.lpt.qry_aggregate_holdings as agg
+import finbourne_sdk_utils.lpt.qry_portfolios as portfolios
+import finbourne_sdk_utils.lpt.get_instruments as get_instruments
+import finbourne_sdk_utils.lpt.qry_portfolio_groups as list_portfolio_group
+import finbourne_sdk_utils.lpt.qry_portfolio_properties as get_port_props
+import finbourne_sdk_utils.lpt.qry_properties as get_props
+import finbourne_sdk_utils.lpt.qry_constituents as get_port_cons
+import finbourne_sdk_utils.lpt.qry_holdings as get_port_holdings
+import finbourne_sdk_utils.lpt.qry_instr_ids as get_instr_id_types
+import finbourne_sdk_utils.lpt.qry_instruments as list_instruments
+import finbourne_sdk_utils.lpt.qry_portfolio_commands as get_port_commands
+import finbourne_sdk_utils.lpt.qry_target_holdings as get_holdings_adj
+import finbourne_sdk_utils.lpt.qry_transactions as get_transactions
+import finbourne_sdk_utils.lpt.search_instruments as search_instruments
+import finbourne_sdk_utils.lpt.create_group_portfolios as cgp
+import finbourne_sdk_utils.lpt.upload_portfolio as up
+import finbourne_sdk_utils.lpt.upload_quotes as uq
+import finbourne_sdk_utils.lpt.txn_config as txn
 import os
 
 

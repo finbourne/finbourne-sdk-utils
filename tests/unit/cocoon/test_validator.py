@@ -1,7 +1,7 @@
 import os
 import unittest
-from lusidtools import logger
-from lusidtools.cocoon.validator import Validator
+from finbourne_sdk_utils import logger
+from finbourne_sdk_utils.cocoon.validator import Validator
 from parameterized import parameterized
 
 

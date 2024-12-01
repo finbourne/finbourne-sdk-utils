@@ -5,7 +5,7 @@
 This package contains a set of utility functions and a Command Line Interface (CLI) for interacting with [LUSID by FINBOURNE](https://www.finbourne.com/lusid-technology). To use it you'll need a LUSID account. [Sign up for free at lusid.com](https://www.lusid.com/app/signup)
 
 
-![PyPI](https://img.shields.io/pypi/v/lusidtools?color=blue)
+![PyPI](https://img.shields.io/pypi/v/finbourne_sdk_utils?color=blue)
 ![Daily build](https://github.com/finbourne/lusid-python-tools/workflows/Daily%20build/badge.svg) 
 ![Build and test](https://github.com/finbourne/lusid-python-tools/workflows/Build%20and%20test/badge.svg)
 ![Commit hook](https://github.com/finbourne/lusid-python-tools/workflows/commit-hook/badge.svg)
@@ -37,7 +37,7 @@ Make sure that the Python `bin` folder is on your search path before trying the 
 
 ## Upgrading
 
-To upgrade lusidtools run one of the commands below 
+To upgrade finbourne_sdk_utils run one of the commands below 
 
 ```sh
 $ pip install finbourne-sdk-utils -U

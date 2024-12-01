@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from tests.unit.apps.test_data import test_transactions as flush_test_data
 
-from lusidtools.apps import (
+from finbourne_sdk_utils.apps import (
     load_instruments,
     load_holdings,
     load_transactions,
@@ -20,8 +20,8 @@ from lusidtools.apps import (
     load_portfolios,
     flush_transactions,
 )
-from lusidtools.cocoon import cocoon_printer
-from lusidtools.logger import LusidLogger
+from finbourne_sdk_utils.cocoon import cocoon_printer
+from finbourne_sdk_utils.logger import LusidLogger
 
 
 class AppTests(unittest.TestCase):
@@ -517,7 +517,7 @@ class AppTests(unittest.TestCase):
 
     @parameterized.expand([["single-batch-failure", 1], ["3-batch-failure", 3]])
     @patch(
-        "lusidtools.apps.flush_transactions.lusid.api.TransactionPortfoliosApi.cancel_transactions"
+        "finbourne_sdk_utils.apps.flush_transactions.lusid.api.TransactionPortfoliosApi.cancel_transactions"
     )
     def test_flush_with_failed_responses(self, _, test_fail, mock_lusid_cancel_txns):
         args = flush_transactions.parse(

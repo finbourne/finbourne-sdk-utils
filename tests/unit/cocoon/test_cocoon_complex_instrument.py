@@ -3,12 +3,12 @@ import unittest
 from pathlib import Path
 import pandas as pd
 
-from lusidtools import cocoon as cocoon
+from finbourne_sdk_utils import cocoon as cocoon
 from parameterized import parameterized
 import lusid
 import lusid.models as models
 
-from lusidtools import logger
+from finbourne_sdk_utils import logger
 from datetime import datetime
 import pytz
 

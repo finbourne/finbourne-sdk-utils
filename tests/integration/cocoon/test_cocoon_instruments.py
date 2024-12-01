@@ -3,13 +3,13 @@ import unittest
 from pathlib import Path
 import pandas as pd
 
-from lusidtools import cocoon as cocoon
+from finbourne_sdk_utils import cocoon as cocoon
 from parameterized import parameterized
 import lusid
-from lusidtools import logger
+from finbourne_sdk_utils import logger
 from datetime import datetime
 import pytz
-from lusidtools.cocoon.utilities import create_scope_id
+from finbourne_sdk_utils.cocoon.utilities import create_scope_id
 
 unique_properties_scope = create_scope_id()
 
@@ -649,7 +649,7 @@ class CocoonTestsInstruments(unittest.TestCase):
                     "identifier_mapping": {"ClientInternal": "client_internal",},
                     "required": {"name": "instrument_name"},
                     "optional": {
-                        "look_through_portfolio_id.scope": "$test-lookthrough-loading-lusidtools",
+                        "look_through_portfolio_id.scope": "$test-lookthrough-loading-finbourne_sdk_utils",
                         "look_through_portfolio_id.code": "lookthrough_code",
                     },
                 },
@@ -663,7 +663,7 @@ class CocoonTestsInstruments(unittest.TestCase):
                     "identifier_mapping": {"ClientInternal": "client_internal",},
                     "required": {"name": "instrument_name"},
                     "optional": {
-                        "look_through_portfolio_id.scope": "$test-lookthrough-loading-lusidtools",
+                        "look_through_portfolio_id.scope": "$test-lookthrough-loading-finbourne_sdk_utils",
                         "look_through_portfolio_id.code": "lookthrough_code",
                     },
                 },
@@ -677,7 +677,7 @@ class CocoonTestsInstruments(unittest.TestCase):
                     "identifier_mapping": {"ClientInternal": "client_internal",},
                     "required": {"name": "instrument_name"},
                     "optional": {
-                        "look_through_portfolio_id.scope": "$test-lookthrough-loading-lusidtools",
+                        "look_through_portfolio_id.scope": "$test-lookthrough-loading-finbourne_sdk_utils",
                         "look_through_portfolio_id.code": "lookthrough_code",
                     },
                 },
@@ -689,7 +689,7 @@ class CocoonTestsInstruments(unittest.TestCase):
         if "default scope" in _:
             self.skipTest("Default parameter using '$' is not supported")
 
-        scope = "test-lookthrough-loading-lusidtools"
+        scope = "test-lookthrough-loading-finbourne_sdk_utils"
         df = pd.read_csv(df)
 
         # replace lookthrough scope

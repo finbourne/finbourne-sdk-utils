@@ -7,7 +7,7 @@ from unittest import mock
 
 from pandas import DataFrame
 
-from lusidtools.lpt import (
+from finbourne_sdk_utils.lpt import (
     lpt,
     lse,
     qry_holdings as qh,

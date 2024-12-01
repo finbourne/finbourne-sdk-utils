@@ -6,11 +6,11 @@ import pandas as pd
 from datetime import datetime
 import pytz
 
-from lusidtools import cocoon as cocoon
+from finbourne_sdk_utils import cocoon as cocoon
 from parameterized import parameterized
 import lusid
-from lusidtools import logger
-from lusidtools.cocoon.utilities import create_scope_id
+from finbourne_sdk_utils import logger
+from finbourne_sdk_utils.cocoon.utilities import create_scope_id
 
 
 def holding_instrument_identifiers(fake1=False, fake2=False):

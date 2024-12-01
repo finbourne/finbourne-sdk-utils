@@ -1,5 +1,5 @@
 import unittest
-from lusidtools.jupyter_tools import StopExecution
+from finbourne_sdk_utils.jupyter_tools import StopExecution
 
 
 class TestPortfolioStopper(unittest.TestCase):

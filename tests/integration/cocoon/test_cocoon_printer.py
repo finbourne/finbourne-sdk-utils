@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 import pandas as pd
 import lusid
-from lusidtools import logger
-from lusidtools.cocoon.cocoon import load_from_data_frame
-from lusidtools.cocoon.cocoon_printer import format_portfolios_response
+from finbourne_sdk_utils import logger
+from finbourne_sdk_utils.cocoon.cocoon import load_from_data_frame
+from finbourne_sdk_utils.cocoon.cocoon_printer import format_portfolios_response
 
 
 class CocoonPrinterIntegrationTests(unittest.TestCase):

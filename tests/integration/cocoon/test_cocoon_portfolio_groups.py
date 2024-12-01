@@ -5,8 +5,8 @@ import json
 import lusid
 import lusid.models as models
 
-from lusidtools import cocoon as cocoon
-from lusidtools.cocoon.utilities import create_scope_id
+from finbourne_sdk_utils import cocoon as cocoon
+from finbourne_sdk_utils.cocoon.utilities import create_scope_id
 import datetime
 from dateutil.tz import tzutc
 import logging

@@ -1,5 +1,5 @@
 import unittest
-from lusidtools.jupyter_tools import toggle_code
+from finbourne_sdk_utils.jupyter_tools import toggle_code
 
 
 class TestHideCodeButton(unittest.TestCase):

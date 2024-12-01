@@ -3,9 +3,9 @@ from pathlib import Path
 import pandas as pd
 import lusid
 
-from lusidtools.cocoon.seed_sample_data import seed_data
-from lusidtools.cocoon.utilities import load_json_file
-from lusidtools.cocoon.utilities import create_scope_id
+from finbourne_sdk_utils.cocoon.seed_sample_data import seed_data
+from finbourne_sdk_utils.cocoon.utilities import load_json_file
+from finbourne_sdk_utils.cocoon.utilities import create_scope_id
 import logging
 import datetime
 import pytz

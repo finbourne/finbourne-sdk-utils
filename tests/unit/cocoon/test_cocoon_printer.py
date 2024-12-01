@@ -5,8 +5,8 @@ import lusid.models as models
 import unittest
 
 
-from lusidtools import logger
-from lusidtools.cocoon.cocoon_printer import (
+from finbourne_sdk_utils import logger
+from finbourne_sdk_utils.cocoon.cocoon_printer import (
     format_portfolios_response,
     format_instruments_response,
     format_holdings_response,
@@ -116,7 +116,7 @@ class MockHttpResp:
 api_exception = lusid.exceptions.ApiException(http_resp=MockHttpResp())
 
 
-# build lusidtools responses
+# build finbourne_sdk_utils responses
 
 responses = {
     "instruments": {

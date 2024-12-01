@@ -3,10 +3,10 @@ from pathlib import Path
 import lusid
 import lusid.models as models
 import unittest
-from lusidtools.pandas_utils.lusid_pandas import lusid_response_to_data_frame
+from finbourne_sdk_utils.pandas_utils.lusid_pandas import lusid_response_to_data_frame
 import pandas as pd
 import datetime
-from lusidtools import logger
+from finbourne_sdk_utils import logger
 import os
 
 class TestResponseToPandasObject(unittest.TestCase):

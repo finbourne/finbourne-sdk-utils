@@ -12,8 +12,8 @@ from lusid import (
 )
 from pandas._testing import assert_frame_equal
 
-from lusidtools.lpt.qry_reconcile_holdings import parse_reconciled_holdings
-from lusidtools.lpt.record import Rec
+from finbourne_sdk_utils.lpt.qry_reconcile_holdings import parse_reconciled_holdings
+from finbourne_sdk_utils.lpt.record import Rec
 
 
 class QueryReconcileHoldingsTests(unittest.TestCase):

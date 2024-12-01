@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 from parameterized import parameterized
 
-import lusidtools.cocoon as cocoon
-from lusidtools import logger
+import finbourne_sdk_utils.cocoon as cocoon
+from finbourne_sdk_utils import logger
 from  .mock_api_factory import MockApiFactory
 import lusid
 

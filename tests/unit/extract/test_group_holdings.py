@@ -1,12 +1,12 @@
 import logging
 import os
 import unittest
-from lusidtools import logger
+from finbourne_sdk_utils import logger
 from datetime import datetime
 from parameterized import parameterized
 import pytz
 
-from lusidtools.extract.group_holdings import _join_holdings
+from finbourne_sdk_utils.extract.group_holdings import _join_holdings
 from lusid.models import (
     PortfolioHolding,
     ModelProperty,

@@ -1,14 +1,14 @@
 import unittest
 import asyncio
-from lusidtools.extract.group_holdings import get_holdings_for_group
+from finbourne_sdk_utils.extract.group_holdings import get_holdings_for_group
 from pathlib import Path
-from lusidtools.cocoon.utilities import create_scope_id
+from finbourne_sdk_utils.cocoon.utilities import create_scope_id
 from parameterized import parameterized
 
-from lusidtools import logger
+from finbourne_sdk_utils import logger
 import lusid
 import pandas as pd
-from lusidtools import cocoon as cocoon
+from finbourne_sdk_utils import cocoon as cocoon
 import os
 import sys
 from lusid.models import CurrencyAndAmount

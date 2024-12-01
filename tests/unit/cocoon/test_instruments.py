@@ -1,8 +1,8 @@
 import logging
 import os
 import unittest
-from lusidtools import logger
-from lusidtools.cocoon.instruments import prepare_key
+from finbourne_sdk_utils import logger
+from finbourne_sdk_utils.cocoon.instruments import prepare_key
 from parameterized import parameterized
 
 

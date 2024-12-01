@@ -4,8 +4,8 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from lusidtools import logger
-from lusidtools.cocoon.dateorcutlabel import DateOrCutLabel
+from finbourne_sdk_utils import logger
+from finbourne_sdk_utils.cocoon.dateorcutlabel import DateOrCutLabel
 from parameterized import parameterized
 from datetime import datetime
 import pytz

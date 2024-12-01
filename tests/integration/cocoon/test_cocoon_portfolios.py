@@ -7,10 +7,10 @@ import pandas
 import pandas as pd
 import lusid
 
-from lusidtools import cocoon as cocoon
+from finbourne_sdk_utils import cocoon as cocoon
 from parameterized import parameterized
-from lusidtools import logger
-from lusidtools.cocoon.utilities import create_scope_id
+from finbourne_sdk_utils import logger
+from finbourne_sdk_utils.cocoon.utilities import create_scope_id
 
 
 class CocoonTestsPortfolios(unittest.TestCase):

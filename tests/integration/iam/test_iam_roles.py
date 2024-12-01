@@ -11,8 +11,8 @@ import finbourne_identity
 from finbourne_access import models as access_models
 from finbourne_identity import models as identity_models
 
-from lusidtools import iam as iam
-from lusidtools import logger
+from finbourne_sdk_utils import iam as iam
+from finbourne_sdk_utils import logger
 
 @unittest.skip('To be depricated')
 class IAMTestsRoles(unittest.TestCase):

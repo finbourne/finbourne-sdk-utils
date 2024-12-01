@@ -6,12 +6,12 @@ from pathlib import Path
 import pandas as pd
 
 
-from lusidtools import cocoon as cocoon
+from finbourne_sdk_utils import cocoon as cocoon
 from parameterized import parameterized
 import lusid
-from lusidtools import logger
-from lusidtools.cocoon.utilities import create_scope_id
-from lusidtools.cocoon import load_from_data_frame
+from finbourne_sdk_utils import logger
+from finbourne_sdk_utils.cocoon.utilities import create_scope_id
+from finbourne_sdk_utils.cocoon import load_from_data_frame
 
 client_internal = "Instrument/default/ClientInternal"
 sedol = "Instrument/default/Sedol"
