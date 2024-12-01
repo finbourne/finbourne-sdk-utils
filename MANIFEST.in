@@ -2,3 +2,4 @@ include finbourne_sdk_utils/cocoon/config/*.json
 exclude finbourne_sdk_utils/commands/**
 exclude finbourne_sdk_utils/data/*
 exclude finbourne_sdk_utils/lpt/*
+include __version__.py
