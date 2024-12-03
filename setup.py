@@ -7,7 +7,7 @@ with open("./__version__.py") as fp:
 setup(
     name="finbourne-sdk-utils",
     version=version["__version__"],
-    description="Python utilities for working with the LUSID SDK",
+    description="Python utilitiesfor LUSID V2 SDK",
     url="https://github.com/finbourne/finbourne-sdk-utils",
     author="FINBOURNE Technology",
     author_email="engineering@finbourne.com",
