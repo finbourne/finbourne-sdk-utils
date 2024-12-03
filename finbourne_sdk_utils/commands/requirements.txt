@@ -1,4 +1,0 @@
-lusid-sdk>=0.9.157
-lusid-tr-sdk>=0.9.132
-pandas>=0.24.0
-tqdm>=4.30.0

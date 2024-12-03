@@ -4,11 +4,8 @@ from parameterized import parameterized
 from pathlib import Path
 from finbourne_sdk_utils.logger import LusidLogger
 from finbourne_sdk_utils.cocoon import load_data_to_df_and_detect_delimiter, parse_args
-from tests.unit.apps.test_data import test_transactions as flush_test_data
-import finbourne_sdk_utils.apps.flush_transactions as flush
+
 import lusid
-import datetime
-from dateutil.tz import tzutc
 
 
 class AppTests(unittest.TestCase):
@@ -236,139 +233,6 @@ class AppTests(unittest.TestCase):
             )
             for key in expected_value.keys()
         ]
-
-    @parameterized.expand(
-        [
-            [
-                "batch-number-greater-than-1",
-                4000,
-                flush_test_data.gen_transaction_data(
-                    1500, datetime.datetime(2020, 2, 14, 0, 0, tzinfo=tzutc())
-                ),
-                [
-                    63,
-                    62,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    61,
-                    33,
-                ],
-            ],
-            [
-                "batch-number-equals-1",
-                4000,
-                flush_test_data.gen_transaction_data(
-                    10, datetime.datetime(2020, 2, 14, 0, 0, tzinfo=tzutc())
-                ),
-                [10],
-            ],
-            [
-                "larger-max-character-count",
-                8000,
-                flush_test_data.gen_transaction_data(
-                    1500, datetime.datetime(2020, 2, 14, 0, 0, tzinfo=tzutc())
-                ),
-                [127, 125, 125, 125, 125, 125, 125, 125, 123, 123, 123, 123, 6],
-            ],
-        ]
-    )
-    def test_transaction_batcher_by_character_count(
-        self, _, maxCharacterCount, whole_txn_set, test_batch_size_list
-    ):
-        txn_id_lst = [txn["transactionId"] for txn in whole_txn_set]
-
-        batched_data = flush.transaction_batcher_by_character_count(
-            "exampleScope",
-            "exampleCode",
-            "www.exampleHost.lusid.com/api",
-            txn_id_lst,
-            maxCharacterCount,
-        )
-        batched_data_size_list = [len(batch) for batch in batched_data]
-
-        self.assertListEqual(batched_data_size_list, test_batch_size_list)
-        for batch in batched_data:
-            batch_length = sum(len(txn_id) for txn_id in batch) + len(
-                f"www.exampleHost.lusid.com/api/api/transactionportfolios/exampleScope/exampleCode/transactions?"
-            )
-            self.assertLessEqual(batch_length, maxCharacterCount)
-
-    @parameterized.expand(
-        [
-            [
-                "1000-transactions",
-                1000,
-                flush.parse(
-                    args=[
-                        "test-scope",
-                        "-p",
-                        "FAndFTestPortfolio01",
-                        "-s",
-                        "2020-02-10T00:00:00.0000000+00:00",
-                        "-e",
-                        "2020-02-28T23:59:59.0000000+00:00",
-                    ]
-                ),
-            ],
-            [
-                "6000-transactions",
-                6000,
-                flush.parse(
-                    args=[
-                        "test-scope",
-                        "-p",
-                        "FAndFTestPortfolio01",
-                        "-s",
-                        "2020-02-10T00:00:00.0000000+00:00",
-                        "-e",
-                        "2020-02-28T23:59:59.0000000+00:00",
-                    ]
-                ),
-            ],
-        ]
-    )
-    def test_get_all_txns(self, _, txn_num, args):
-        self.transaction_portfolios_api.create_portfolio(
-            self.testscope,
-            {
-                "displayName": "TestPortfolio",
-                "description": "Portfolio for flush tests",
-                "code": self.code,
-                "created": "2018-03-05T12:00:00.0000000+00:00",
-                "baseCurrency": "USD",
-            },
-        )
-        self.transaction_portfolios_api.upsert_transactions(
-            self.testscope,
-            self.code,
-            flush_test_data.gen_transaction_data(
-                txn_num, datetime.datetime(2020, 2, 14, 0, 0, tzinfo=tzutc()).isoformat().replace("+00:00", "Z")
-            ),
-        )
-        args.secrets = self.secrets
-
-        self.assertEqual(txn_num, len(list(flush.get_all_txns(args).values())[0]))
-
-        self.portfolios_api.delete_portfolio(self.testscope, self.code)
 
     @classmethod
     def tearDownClass(cls) -> None:

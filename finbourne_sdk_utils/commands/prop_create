@@ -1,5 +1,0 @@
-#!/usr/bin/python3
-
-import finbourne_sdk_utils.lpt.create_properties as cp
-
-cp.main()
