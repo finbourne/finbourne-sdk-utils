@@ -199,8 +199,8 @@ def populate_model(
         identifiers=identifiers,
         sub_holding_keys=sub_holding_keys,
     )
-
-
+    
+    
 @checkargs
 def set_attributes_recursive(
     model_object,
@@ -334,15 +334,24 @@ def set_attributes_recursive(
 
     # Support for polymorphism, we can identify these `abstract` classes by the existence of the below
     
-    """     if getattr(instance, "discriminator"):
-            discriminator = getattr(instance, getattr(instance, "discriminator"))
+    # see the openapi template model.generic.mustache
+    # this string must match the template 
+    if hasattr(instance, "_"+ type(instance).__name__ + "__discriminator_property_name"):
+    
+        discriminatorFieldCamelCase = getattr(instance, "_"+ type(instance).__name__ + "__discriminator_property_name")
 
-            actual_class = model_object.discriminator_value_class_map[discriminator]
+        discriminator_field = camel_case_to_pep_8(discriminatorFieldCamelCase)
 
-            return set_attributes_recursive(
-                model_object=getattr(lusid.models, actual_class), mapping=mapping, row=row,
-            )
-    """
+        class_map = getattr(instance, "_"+ type(instance).__name__ + "__discriminator_value_class_map");
+        
+        class_alias = getattr(instance, discriminator_field )
+        
+        actual_class = class_map[class_alias]
+
+        return set_attributes_recursive(
+            model_object=getattr(lusid.models, actual_class), mapping=mapping, row=row,
+        )
+
     return instance
 
 
