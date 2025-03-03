@@ -26,7 +26,7 @@ setup(
         "openpyxl>=3.0.7",
         "xlrd~=1.2",
         "pytz>=2019.3",
-        "IPython>=7.31.1",
+        "IPython==8.32",
         "lusid-sdk>=2",
     ],
     include_package_data=True,
