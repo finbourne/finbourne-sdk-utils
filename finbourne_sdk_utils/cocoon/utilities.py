@@ -346,8 +346,11 @@ def set_attributes_recursive(
         
         class_alias = getattr(instance, discriminator_field )
         
-        actual_class = class_map[class_alias]
-
+        try:
+            actual_class = class_map[class_alias]
+        except KeyError as e:
+            raise ValueError(f"Could not find a class for the discriminator value {class_alias} in the class map {class_map}") from e
+        
         return set_attributes_recursive(
             model_object=getattr(lusid.models, actual_class), mapping=mapping, row=row,
         )
