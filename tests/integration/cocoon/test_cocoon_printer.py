@@ -1,4 +1,5 @@
 import os
+import re
 import unittest
 import json
 from pathlib import Path
@@ -49,8 +50,21 @@ class CocoonPrinterIntegrationTests(unittest.TestCase):
         self.assertEqual(1, len(err))
         for index, row in err.iterrows():
             self.assertEqual(row[err.columns[0]], "Bad Request")
-            # Regex for request id patterns
-            self.assertRegex(row[err.columns[2]], r"[A-Z0-9]{13}:[A-F0-9]{8}")
+            
+            
+            # regex for new and old request id patterns
+            patterns = [r"([A-Z0-9]+:[A-Z0-9]+)", r"(\d{10}-[a-f0-9]{32})"]
+
+            foundRequestId = False
+            for pattern in patterns:
+                match = re.search(pattern, row[err.columns[2]])
+                if match:
+                    print(f"{match.group(1)} matched pattern: {pattern}")
+                    foundRequestId = True
+                    break
+                
+            self.assertTrue(foundRequestId, "No request id found in error message")
+                    
             # Deserialise the ErrorDetails field and check one of the values
             self.assertEqual(
                 json.loads(row[err.columns[3]]).get("name"), "UndefinedCurrencyFailure"
