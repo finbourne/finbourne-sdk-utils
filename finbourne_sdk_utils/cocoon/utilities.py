@@ -692,48 +692,26 @@ def get_required_attributes_from_model(model_object) -> list:
         The required attributes
     """
 
-    # Get the source code for the model
-    model_details = inspect.getsource(model_object)
+    required_attributes = []
+    
+    # Use pydantic's __fields__ to determine required fields
+    # This is more reliable than parsing source code
+    if hasattr(model_object, '__fields__'):
+        for field_name, field_info in model_object.__fields__.items():
+            # In Pydantic v1, required fields have field_info.required = True
+            if field_info.required:
+                required_attributes.append(field_name)
+    else:
+        # Fallback to old regex-based approach for backwards compatibility
+        # Get the source code for the model
+        model_details = inspect.getsource(model_object)
 
-    # bit of cleansing to aid the regex
-    model_details = model_details.replace('"""','')
-    model_details = model_details.replace( r"\n","\n")
-    
-    
-    required_attributes = re.findall(r'(\w+):.*?= Field\(\.\.\.,', model_details)
-    all_attributes = re.findall(r'^\s*(\w+):', model_details, re.MULTILINE)
-    
-
-    # Set the status (required or optional) for each attribute based on whether "is None:" exists in the setter function
-    '''
-    Here are two examples
-    
-    A) A None value is not allowed and hence this is required. Notice the "if identifiers is None:" condition. 
-    
-    @identifiers.setter
-    def identifiers(self, identifiers):
-        """Sets the identifiers of this InstrumentDefinition.
-        A set of identifiers that can be used to identify the instrument. At least one of these must be configured to be a unique identifier.  # noqa: E501
-        :param identifiers: The identifiers of this InstrumentDefinition.  # noqa: E501
-        :type: dict(str, InstrumentIdValue)
-        """
-        if identifiers is None:
-            raise ValueError("Invalid value for `identifiers`, must not be `None`")  # noqa: E501
-
-        self._identifiers = identifiers
+        # bit of cleansing to aid the regex
+        model_details = model_details.replace('"""','')
+        model_details = model_details.replace( r"\n","\n")
         
-    B) A None value is allowed and hence this is optional
+        required_attributes = re.findall(r'(\w+):.*?= Field\(\.\.\.,', model_details)
     
-    @look_through_portfolio_id.setter
-    def look_through_portfolio_id(self, look_through_portfolio_id):
-        """Sets the look_through_portfolio_id of this InstrumentDefinition.
-        :param look_through_portfolio_id: The look_through_portfolio_id of this InstrumentDefinition.  # noqa: E501
-        :type: ResourceId
-        """
-
-        self._look_through_portfolio_id = look_through_portfolio_id
-
-    '''
     return required_attributes
 
 

@@ -935,7 +935,7 @@ class CocoonTestsHoldings(unittest.TestCase):
         :return: None
         """
         # Unchanged vars that have no need to be passed via param (they would count as duplicate lines)
-        scope = "unmatched_holdings_test"
+        scope = f"unmatched_holdings_test_{create_scope_id()}"
         mapping_required = {
             "code": "FundCode",
             "effective_at": "Effective Date",
@@ -955,6 +955,33 @@ class CocoonTestsHoldings(unittest.TestCase):
         expected_outcome = lusid.models.Version
 
         data_frame = pd.read_csv(Path(__file__).parent.joinpath(file_name))
+
+        # Create instruments that should resolve (for tests expecting instruments to exist)
+        # This is specifically for the test with incorrect SEDOL but correct ISIN and ClientInternal
+        if "incorrect-sedol-correct_isin_clientInternal_should_resolve" in file_name:
+            instruments_df = pd.DataFrame([{
+                "name": "12% BD REDEEM 26/07/2014 CRC 1000000",
+                "isin": "CRMADAPB2335",
+                "clientInternal": "3940007-CRBNV-CRC"
+            }])
+            
+            instrument_response = cocoon.cocoon.load_from_data_frame(
+                api_factory=self.api_factory,
+                scope=scope,
+                data_frame=instruments_df,
+                mapping_required={
+                    "name": "name"
+                },
+                mapping_optional={},
+                identifier_mapping={
+                    "Isin": "isin",
+                    "ClientInternal": "clientInternal"
+                },
+                file_type="instruments"
+            )
+            
+            # Verify instruments were created successfully
+            self.assertEqual(len(instrument_response.get("instruments").get("errors")), 0)
 
         # Create the portfolios
         portfolio_response = cocoon.cocoon.load_from_data_frame(
@@ -1103,7 +1130,7 @@ class CocoonTestsHoldings(unittest.TestCase):
         :return: None
         """
         # Unchanged vars that have no need to be passed via param (they would count as duplicate lines)
-        scope = "unmatched_holdings_test"
+        scope = f"unmatched_holdings_test_{create_scope_id()}"
         mapping_required = {
             "code": "FundCode",
             "effective_at": "Effective Date",
