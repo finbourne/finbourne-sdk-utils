@@ -341,3 +341,76 @@ class CocoonPropertiesTests(unittest.TestCase):
             second=full_keys,
             msg="The full keys don't matched the expected outcome",
         )
+    def test_create_property_definitions_with_leading_nulls(self):
+        """
+        Tests that property definitions are created with correct data types
+        even when columns have leading null values.
+        
+        The function should find the first non-null value and infer the type
+        from that, rather than defaulting to string for columns with null headers.
+        """
+        # Create a DataFrame with leading nulls in both string and numeric columns
+        data_frame = pd.DataFrame(
+            data=[
+                {
+                    "Name": np.nan,
+                    "Count": np.nan,
+                    "Rating": np.nan,
+                },
+                {
+                    "Name": np.nan,
+                    "Count": np.nan,
+                    "Rating": np.nan,
+                },
+                {
+                    "Name": "Product A",  # First non-null string value
+                    "Count": 42,  # First non-null integer value
+                    "Rating": 4.5,  # First non-null float value
+                },
+                {
+                    "Name": "Product B",
+                    "Count": 100,
+                    "Rating": 3.8,
+                },
+            ]
+        )
+
+        missing_property_columns = ["Name", "Count", "Rating"]
+        column_to_scope = {col: "default" for col in missing_property_columns}
+
+        # Call the function
+        property_key_mapping, updated_data_frame = cocoon.properties.create_property_definitions_from_file(
+            api_factory=self.api_factory,
+            domain="Instrument",
+            data_frame=data_frame,
+            missing_property_columns=missing_property_columns,
+            column_to_scope=column_to_scope,
+        )
+
+        # Validate that properties were created
+        self.assertEqual(len(property_key_mapping), 3)
+        self.assertIn("Name", property_key_mapping)
+        self.assertIn("Count", property_key_mapping)
+        self.assertIn("Rating", property_key_mapping)
+
+        # Validate property keys were created correctly
+        self.assertEqual(
+            property_key_mapping["Name"],
+            "Instrument/default/Name"
+        )
+        self.assertEqual(
+            property_key_mapping["Count"],
+            "Instrument/default/Count"
+        )
+        self.assertEqual(
+            property_key_mapping["Rating"],
+            "Instrument/default/Rating"
+        )
+
+        # Validate that the DataFrame data types were inferred correctly
+        # Count should be int64 or float64 (numeric)
+        self.assertIn(str(updated_data_frame["Count"].dtype), ["int64", "float64"])
+        # Rating should be float64 (numeric)
+        self.assertEqual(str(updated_data_frame["Rating"].dtype), "float64")
+        # Name should remain object (string)
+        self.assertEqual(str(updated_data_frame["Name"].dtype), "object")

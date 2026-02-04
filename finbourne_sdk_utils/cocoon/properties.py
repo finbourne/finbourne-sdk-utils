@@ -203,15 +203,50 @@ def create_property_definitions_from_file(
         # Make the column name LUSID friendly
         lusid_friendly_code = cocoon.utilities.make_code_lusid_friendly(column_name)
 
-        # If there is no data Pandas infers a type of float, would prefer to infer object
+        # Check if column is all nulls
         if missing_property_data_frame[column_name].isnull().all():
             logging.warning(
-                f"{column_name} is null, no type can be inferred it will be treated as a string"
+                f"{column_name} is entirely null, no type can be inferred - will be treated as a string"
             )
             data_type = "object"
             data_frame[column_name] = data_frame[column_name].astype(
                 "object", copy=False
             )
+        else:
+            # Find the first non-null value to infer the proper type
+            first_valid_value = missing_property_data_frame[column_name].dropna().iloc[0]
+            
+            # Infer the type from the first non-null value
+            inferred_type = type(first_valid_value).__name__
+            
+            # Map Python types to pandas dtypes
+            type_mapping = {
+                'str': 'object',
+                'int': 'int64',
+                'float': 'float64',
+                'bool': 'bool',
+                'Timestamp': 'datetime64[ns]',
+            }
+            
+            # Get the appropriate pandas dtype
+            inferred_dtype = type_mapping.get(inferred_type, 'object')
+            
+            # Only override if the current dtype is object and we found something more specific
+            if str(data_type) == 'object' and inferred_dtype != 'object':
+                logging.info(
+                    f"{column_name} has leading nulls - inferring type '{inferred_dtype}' from first non-null value"
+                )
+                data_type = inferred_dtype
+                # Optionally convert the column to the inferred type
+                try:
+                    data_frame[column_name] = data_frame[column_name].astype(
+                        inferred_dtype, copy=False
+                    )
+                except (ValueError, TypeError) as e:
+                    logging.warning(
+                        f"Could not convert {column_name} to {inferred_dtype}, keeping as object. Error: {e}"
+                    )
+                    data_type = 'object'
 
         # Create a request to define the property, assumes value_required is false for all
         property_request = lusid.models.CreatePropertyDefinitionRequest(
