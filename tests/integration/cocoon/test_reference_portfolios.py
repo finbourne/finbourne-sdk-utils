@@ -1,32 +1,31 @@
 import os
-import unittest
+import pytest
 from pathlib import Path
 import pandas as pd
-import lusid
-
+import finbourne.sdk.services.lusid as lusid
+from finbourne.sdk.extensions import SyncApiClientFactory
 
 from finbourne_sdk_utils import cocoon as cocoon
 from finbourne_sdk_utils import logger
 from finbourne_sdk_utils.cocoon.utilities import create_scope_id
-from parameterized import parameterized
 
 
-class CocoonTestsReferencePortfolios(unittest.TestCase):
+class TestCocoonReferencePortfolios:
     @classmethod
-    def setUpClass(cls) -> None:
+    def setup_class(cls) -> None:
 
-        cls.api_factory = lusid.SyncApiClientFactory()
-        
-        cls.portfolios_api = cls.api_factory.build(lusid.api.PortfoliosApi)
+        cls.api_factory = SyncApiClientFactory()
+
+        cls.portfolios_api = cls.api_factory.build(lusid.PortfoliosApi)
         cls.unique_id = create_scope_id()
         cls.logger = logger.LusidLogger(os.getenv("FBN_LOG_LEVEL", "info"))
         cls.scope = "ModelFundTest"
         cls.file_name = "data/reference-portfolio/reference-test.csv"
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "file_name, mapping_required, mapping_optional, property_columns",
         [
-            [
-                "Load a reference portfolio with required attributes only",
+            (
                 "data/reference-portfolio/reference-test.csv",
                 {"code": "FundCode", "display_name": "display_name"},
                 {
@@ -35,9 +34,8 @@ class CocoonTestsReferencePortfolios(unittest.TestCase):
                     "base_currency": "base_currency",
                 },
                 [],
-            ],
-            [
-                "Load a reference portfolio with required attributes AND properties",
+            ),
+            (
                 "data/reference-portfolio/reference-test.csv",
                 {"code": "FundCode", "display_name": "display_name"},
                 {
@@ -46,9 +44,8 @@ class CocoonTestsReferencePortfolios(unittest.TestCase):
                     "base_currency": "base_currency",
                 },
                 ["strategy", "custodian"],
-            ],
-            [
-                "Load duplicate reference portfolios",
+            ),
+            (
                 "data/reference-portfolio/reference-test-duplicates.csv",
                 {"code": "FundCode", "display_name": "display_name"},
                 {
@@ -57,11 +54,11 @@ class CocoonTestsReferencePortfolios(unittest.TestCase):
                     "base_currency": "base_currency",
                 },
                 [],
-            ],
-        ]
+            ),
+        ],
     )
     def test_load_from_data_frame_attributes_and_properties_success(
-        self, _, file_name, mapping_required, mapping_optional, property_columns,
+        self, file_name, mapping_required, mapping_optional, property_columns,
     ) -> None:
         """
         Test that a reference portfolio can be loaded successfully
@@ -95,29 +92,21 @@ class CocoonTestsReferencePortfolios(unittest.TestCase):
 
         # Check that the count of portfolios uploaded equals count of portfolios in DataFrame
 
-        self.assertEqual(
-            first=len(responses["reference_portfolios"]["success"]),
-            second=len(data_frame),
-        )
+        assert len(responses["reference_portfolios"]["success"]) == len(data_frame)
 
         # Assert that by no unmatched_identifiers are returned in the response for reference_portfolios
-        self.assertFalse(
-            responses["reference_portfolios"].get("unmatched_identifiers", False)
-        )
+        assert not responses["reference_portfolios"].get("unmatched_identifiers", False)
 
         # Check that the portfolio IDs of porfolios uploaded matches the IDs of portfolios in DataFrame
 
         response_codes = [
             response.id.code
-            if isinstance(response, lusid.models.Portfolio)
+            if isinstance(response, lusid.Portfolio)
             else response.origin_portfolio_id.code
             for response in responses["reference_portfolios"]["success"]
         ]
 
-        self.assertEqual(
-            first=response_codes,
-            second=list(data_frame[mapping_required["code"]].values),
-        )
+        assert response_codes == list(data_frame[mapping_required["code"]].values)
 
         # Check that properties get added to portfolio
 
@@ -138,9 +127,7 @@ class CocoonTestsReferencePortfolios(unittest.TestCase):
                 if len(property_columns) > 0
             ]
 
-            self.assertCountEqual(
-                [prop for prop in get_portfolio.properties], property_keys_from_params,
-            )
+            assert sorted([prop for prop in (get_portfolio.properties or {})]) == sorted(property_keys_from_params)
 
     def test_portfolio_missing_attribute(self):
 
@@ -155,7 +142,7 @@ class CocoonTestsReferencePortfolios(unittest.TestCase):
             "base_currency": "base_currency",
         }
 
-        with self.assertRaises(ValueError) as error:
+        with pytest.raises(ValueError) as exc_info:
 
             cocoon.cocoon.load_from_data_frame(
                 api_factory=self.api_factory,
@@ -170,8 +157,5 @@ class CocoonTestsReferencePortfolios(unittest.TestCase):
                 sub_holding_keys=[],
             )
 
-        self.assertEqual(
-            error.exception.args[0],
-            """The required attributes {'display_name'} are missing from the mapping. Please
-                             add them.""",
-        )
+        assert exc_info.value.args[0] == """The required attributes {'display_name'} are missing from the mapping. Please
+                             add them."""

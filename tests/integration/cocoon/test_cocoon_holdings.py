@@ -1,5 +1,4 @@
 import os
-import unittest
 import json
 from pathlib import Path
 import pandas as pd
@@ -7,8 +6,10 @@ from datetime import datetime
 import pytz
 
 from finbourne_sdk_utils import cocoon as cocoon
-from parameterized import parameterized
-import lusid
+import pytest
+import finbourne.sdk.services.lusid as lusid
+from finbourne.sdk.extensions import SyncApiClientFactory
+from finbourne.sdk.exceptions import ApiException
 from finbourne_sdk_utils import logger
 from finbourne_sdk_utils.cocoon.utilities import create_scope_id
 
@@ -50,18 +51,18 @@ def extract_unique_identifiers_from_holdings_response(response):
     )
 
 
-class CocoonTestsHoldings(unittest.TestCase):
+class TestCocoonHoldings:
     @classmethod
-    def setUpClass(cls) -> None:
+    def setup_class(cls) -> None:
         
-        cls.api_factory = lusid.SyncApiClientFactory()
+        cls.api_factory = SyncApiClientFactory()
         
         cls.logger = logger.LusidLogger(os.getenv("FBN_LOG_LEVEL", "info"))
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "scope, file_name, mapping_required, mapping_optional, identifier_mapping, property_columns, properties_scope, sub_holding_keys, sub_holding_key_scope, holdings_adjustment_only, expected_outcome",
         [
-            [
-                "Standard successful load",
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
                 {
@@ -87,10 +88,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 None,
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Standard load with ~700 portfolios",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-large.csv",
                 {
@@ -116,10 +116,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 None,
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Standard successful load with adjustment only",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
                 {
@@ -145,10 +144,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 None,
                 None,
                 True,
-                lusid.models.Version,
-            ],
-            [
-                "Standard successful load with string index",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date-string-index.csv",
                 {
@@ -174,10 +172,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 None,
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Standard successful load with duplicate index",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date-duplicate-index.csv",
                 {
@@ -203,10 +200,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 None,
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Standard successful load with unique properties scope",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
                 {
@@ -232,10 +228,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 None,
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Add in some constants",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
                 {
@@ -261,10 +256,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 None,
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Add in a default value for a required field with no specified column",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
                 {
@@ -290,10 +284,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 None,
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Add in a column as a nested dictionary",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
                 {
@@ -319,10 +312,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 None,
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Add in a column and default as a nested dictionary",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
                 {
@@ -351,10 +343,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 None,
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Multiple effective dates in a holdings file",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example.csv",
                 {
@@ -380,10 +371,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 None,
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Standard successful load with sub-holding-keys based on a column that exists in the file",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
                 {
@@ -409,10 +399,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 ["Security Description"],
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Standard successful load with sub-holding-keys based on two columns that exists in the file",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
                 {
@@ -438,10 +427,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 ["Security Description", "Prime Broker"],
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Standard successful load with a sub-holding-key that is not populated for all rows",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
                 {
@@ -467,10 +455,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 ["swap"],
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Standard successful load with a sub-holding-key that has no pre-existing property definition",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
                 {
@@ -496,10 +483,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 ["Prime Broker"],
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Standard successful load with a sub-holding-key that has no pre-existing property definition and a different scope",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
                 {
@@ -521,14 +507,13 @@ class CocoonTestsHoldings(unittest.TestCase):
                     "Currency": "is_cash_with_currency",
                 },
                 ["Prime Broker"],
-                f"operations001",
+                "operations001",
                 ["Prime Broker"],
                 f"accountview_{create_scope_id()}",
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Standard successful load with a sub-holding-key that has a metric value",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
                 {
@@ -554,10 +539,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 ["Quantity"],
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Duplicate column in the source file",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date-duplicate-column.csv",
                 {
@@ -583,10 +567,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 None,
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Pass string as tax_lots.units value",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date-duplicate-column.csv",
                 {
@@ -612,10 +595,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 None,
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Pass integer as tax_lots.units value",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date-duplicate-column.csv",
                 {
@@ -641,11 +623,9 @@ class CocoonTestsHoldings(unittest.TestCase):
                 None,
                 None,
                 False,
-                lusid.models.Version,
-            ],
-            [
-                "Standard successful load but with one unmatched identifier. No flag for return_unmatched_identifiers"
-                "means that we should not get that unmatched_identifier returned.",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/holdings-example-unique-date-one-unmatched-instrument.csv",
                 {
@@ -671,13 +651,12 @@ class CocoonTestsHoldings(unittest.TestCase):
                 None,
                 None,
                 False,
-                lusid.models.Version,
-            ],
+                lusid.Version,
+            ),
         ]
     )
     def test_load_from_data_frame_holdings_success(
         self,
-        _,
         scope,
         file_name,
         mapping_required,
@@ -724,179 +703,155 @@ class CocoonTestsHoldings(unittest.TestCase):
             sub_holding_keys_scope=sub_holding_key_scope,
         )
 
-        self.assertGreater(len(responses["holdings"]["success"]), 0)
+        assert len(responses["holdings"]["success"]) > 0
 
-        self.assertEqual(
-            len(responses["holdings"]["errors"]), 0, responses["holdings"]["errors"]
-        )
+        assert len(responses["holdings"]["errors"]) == 0, responses["holdings"]["errors"]
 
         # Assert that by default no unmatched_identifiers are returned in the response
-        self.assertFalse(responses["holdings"].get("unmatched_identifiers", False))
+        assert not responses["holdings"].get("unmatched_identifiers", False)
 
-        self.assertTrue(
-            expr=all(
+        assert all(
                 isinstance(success_response.version, expected_outcome)
                 for success_response in responses["holdings"]["success"]
             )
-        )
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "file_name, sub_holding_keys, holdings_adjustment_only, expected_holdings_in_response, expected_unmatched_identifiers",
         [
-            [
-                "Standard successful load with no unmatched instruments - SetHolding",
+            (
                 "data/holdings-example-unique-date.csv",
                 None,
                 False,
                 0,
                 holding_instrument_identifiers(fake1=False, fake2=False),
-            ],
-            [
-                "Standard successful load with one unmatched instrument - SetHolding",
+            ),
+            (
                 "data/holdings-example-unique-date-one-unmatched-instrument.csv",
                 None,
                 False,
                 1,
                 holding_instrument_identifiers(fake1=True, fake2=False),
-            ],
-            [
-                "Standard successful load with one instrument that has a correct Isin and ClientInternal "
-                "but fake Sedol so it should still resolve and return no unmatched identifiers - SetHolding",
+            ),
+            (
                 "data/holdings-example-unique-date-incorrect-sedol-correct_isin_clientInternal_should_resolve.csv",
                 None,
                 False,
                 0,
                 holding_instrument_identifiers(fake1=False, fake2=False),
-            ],
-            [
-                "Standard successful load with one unmatched instrument in two separate adjustments (two portfolios) - SetHolding",
+            ),
+            (
                 "data/holdings-example-unique-date-one-unmatched-instrument-duplicated-in-two-adjustments.csv",
                 None,
                 False,
                 2,
                 holding_instrument_identifiers(fake1=True, fake2=False),
-            ],
-            [
-                "Standard successful load with two unmatched instrument in two separate adjustments (two portfolios) - SetHolding",
+            ),
+            (
                 "data/holdings-example-unique-date-two-unmatched-instruments-separate-adjustments.csv",
                 None,
                 False,
                 2,
                 holding_instrument_identifiers(fake1=True, fake2=True),
-            ],
-            [
-                "Standard successful load with two unmatched instrument in one single adjustment (one portfolio) - SetHolding",
+            ),
+            (
                 "data/holdings-example-unique-date-two-unmatched-instruments-single-adjustment.csv",
                 None,
                 False,
                 2,
                 holding_instrument_identifiers(fake1=True, fake2=True),
-            ],
-            [
-                "Standard successful load with one unmatched instrument in two adjustments across two dates (one portfolio) - SetHolding",
+            ),
+            (
                 "data/holdings-example-one-unmatched-instrument-in-two-adjustments-one-portfolio-two-dates.csv",
                 None,
                 False,
                 2,
                 holding_instrument_identifiers(fake1=True, fake2=False),
-            ],
-            [
-                "Standard successful load with one unmatched instrument in two adjustments one date (two portfolios) - SetHolding",
+            ),
+            (
                 "data/holdings-example-same-date-one-unmatched-instrument-duplicated-in-two-adjustments-two-portfolios.csv",
                 None,
                 False,
                 2,
                 holding_instrument_identifiers(fake1=True, fake2=False),
-            ],
-            [
-                "Standard successful load with two unmatched instrument in two adjustments two dates (two portfolios) - SetHolding",
+            ),
+            (
                 "data/holdings-example-two-dates-two-unmatched-instruments-separate-adjustments-two-portfolios.csv",
                 None,
                 False,
                 4,
                 holding_instrument_identifiers(fake1=True, fake2=True),
-            ],
-            [
-                "One portfolio, one sub-holding-key, one date, two instruments - SetHolding",
+            ),
+            (
                 "data/holdings-example-one-portfolio-one-shk-one-date-two-instruments.csv",
                 ["Security Description"],
                 False,
                 2,
                 holding_instrument_identifiers(fake1=True, fake2=True),
-            ],
-            [
-                "One portfolio, one sub-holding-key, two dates, two instruments - SetHolding",
+            ),
+            (
                 "data/holdings-example-one-portfolio-one-shk-two-dates-two-instruments.csv",
                 ["Security Description"],
                 False,
                 2,
                 holding_instrument_identifiers(fake1=True, fake2=True),
-            ],
-            [
-                "One portfolio, two sub-holding-keys, one date, same instrument - SetHolding",
+            ),
+            (
                 "data/holdings-example-one-portfolio-two-shks-one-date-one-instrument.csv",
                 ["Security Description"],
                 False,
                 2,
                 holding_instrument_identifiers(fake1=True, fake2=False),
-            ],
-            [
-                "One portfolio, two sub-holding-keys, one date, two instruments - SetHolding",
+            ),
+            (
                 "data/holdings-example-one-portfolio-two-shks-one-date-two-instruments.csv",
                 ["Security Description"],
                 False,
                 2,
                 holding_instrument_identifiers(fake1=True, fake2=True),
-            ],
-            [
-                "One portfolio, two sub-holding-keys, two dates, two instruments - SetHolding",
+            ),
+            (
                 "data/holdings-example-one-portfolio-two-shks-two-dates-two-instruments.csv",
                 ["Security Description"],
                 False,
                 2,
                 holding_instrument_identifiers(fake1=True, fake2=True),
-            ],
-            [
-                "One portfolio, two sub-holding-keys, two dates, same instrument - SetHolding",
+            ),
+            (
                 "data/holdings-example-one-portfolio-two-shks-two-dates-one-instrument.csv",
                 ["Security Description"],
                 False,
                 2,
                 holding_instrument_identifiers(fake1=True, fake2=False),
-            ],
-            [
-                "One portfolio, two sub-holding-keys, two dates, same instrument - AdjustHolding",
+            ),
+            (
                 "data/holdings-example-one-portfolio-two-shks-two-dates-one-instrument.csv",
                 ["Security Description"],
                 True,
                 2,
                 holding_instrument_identifiers(fake1=True, fake2=False),
-            ],
-            [
-                "One portfolio, one sub-holding-key, two dates, two instruments - AdjustHolding",
+            ),
+            (
                 "data/holdings-example-one-portfolio-one-shk-two-dates-two-instruments.csv",
                 ["Security Description"],
                 True,
                 2,
                 holding_instrument_identifiers(fake1=True, fake2=True),
-            ],
-            [
-                "Standard successful load with two unmatched instrument in one single adjustment (one portfolio) - AdjustHolding",
+            ),
+            (
                 "data/holdings-example-unique-date-two-unmatched-instruments-single-adjustment.csv",
                 None,
                 True,
                 2,
                 holding_instrument_identifiers(fake1=True, fake2=True),
-            ],
-            [
-                "Standard successful load with one unmatched instrument - AdjustHolding",
+            ),
+            (
                 "data/holdings-example-unique-date-one-unmatched-instrument.csv",
                 None,
                 True,
                 1,
                 holding_instrument_identifiers(fake1=True, fake2=False),
-            ],
-            [
-                "Standard successful load with two unmatched instruments across 3 unique identifiers - AdjustHolding",
+            ),
+            (
                 "data/holdings-example-unique-date-two-unmatched-instruments-single-adjustment_three_unique_ids.csv",
                 None,
                 True,
@@ -911,12 +866,11 @@ class CocoonTestsHoldings(unittest.TestCase):
                         "Instrument/default/Isin": "FAKEISIN2",
                     },
                 ],
-            ],
+            ),
         ]
     )
     def test_load_from_data_frame_holdings_success_with_unmatched_items(
         self,
-        _,
         file_name,
         sub_holding_keys,
         holdings_adjustment_only,
@@ -952,7 +906,7 @@ class CocoonTestsHoldings(unittest.TestCase):
         properties_scope = "operations001"
         sub_holding_key_scope = None
         return_unmatched_items = True
-        expected_outcome = lusid.models.Version
+        expected_outcome = lusid.Version
 
         data_frame = pd.read_csv(Path(__file__).parent.joinpath(file_name))
 
@@ -981,7 +935,7 @@ class CocoonTestsHoldings(unittest.TestCase):
             )
             
             # Verify instruments were created successfully
-            self.assertEqual(len(instrument_response.get("instruments").get("errors")), 0)
+            assert len(instrument_response.get("instruments").get("errors")) == 0
 
         # Create the portfolios
         portfolio_response = cocoon.cocoon.load_from_data_frame(
@@ -998,7 +952,7 @@ class CocoonTestsHoldings(unittest.TestCase):
         )
 
         # Assert that all portfolios were created without any issues
-        self.assertEqual(len(portfolio_response.get("portfolios").get("errors")), 0)
+        assert len(portfolio_response.get("portfolios").get("errors")) == 0
 
         # Load in the holdings adjustments
         holding_responses = cocoon.cocoon.load_from_data_frame(
@@ -1017,32 +971,26 @@ class CocoonTestsHoldings(unittest.TestCase):
             return_unmatched_items=return_unmatched_items,
         )
 
-        self.assertGreater(len(holding_responses["holdings"]["success"]), 0)
+        assert len(holding_responses["holdings"]["success"]) > 0
 
-        self.assertEqual(len(holding_responses["holdings"]["errors"]), 0)
+        assert len(holding_responses["holdings"]["errors"]) == 0
 
         # Assert that the number of holdings returned are as expected
-        self.assertEqual(
-            len(holding_responses["holdings"]["unmatched_items"]),
-            expected_holdings_in_response,
-        )
+        assert len(holding_responses["holdings"]["unmatched_items"]) == expected_holdings_in_response
 
         # Assert that the holdings returned only contain the instrument identifiers that did not resolve
-        self.assertCountEqual(
-            extract_unique_identifiers_from_holdings_response(holding_responses),
-            expected_unmatched_identifiers,
-        )
+        actual = extract_unique_identifiers_from_holdings_response(holding_responses)
+        assert len(actual) == len(expected_unmatched_identifiers)
+        assert all(item in expected_unmatched_identifiers for item in actual)
 
-        self.assertTrue(
-            expr=all(
+        assert all(
                 isinstance(success_response.version, expected_outcome)
                 for success_response in holding_responses["holdings"]["success"]
             )
-        )
 
         # Delete the portfolios at the end of the test
         for portfolio in portfolio_response.get("portfolios").get("success"):
-            self.api_factory.build(lusid.api.PortfoliosApi).delete_portfolio(
+            self.api_factory.build(lusid.PortfoliosApi).delete_portfolio(
                 scope=scope, code=portfolio.id.code
             )
 
@@ -1062,10 +1010,10 @@ class CocoonTestsHoldings(unittest.TestCase):
         # Create an empty portfolio for the test, but handle situations where the portfolio already exists
         try:
             portfolio_setup_response = self.api_factory.build(
-                lusid.api.TransactionPortfoliosApi
+                lusid.TransactionPortfoliosApi
             ).create_portfolio(
                 scope=portfolio_code_and_scope,
-                create_transaction_portfolio_request=lusid.models.CreateTransactionPortfolioRequest(
+                create_transaction_portfolio_request=lusid.CreateTransactionPortfolioRequest(
                     display_name=portfolio_code_and_scope,
                     description=portfolio_code_and_scope,
                     code=portfolio_code_and_scope,
@@ -1075,9 +1023,9 @@ class CocoonTestsHoldings(unittest.TestCase):
             )
 
             # Assert that the portfolio was created successfully
-            self.assertIsInstance(portfolio_setup_response, lusid.models.Portfolio)
+            assert isinstance(portfolio_setup_response, lusid.Portfolio)
 
-        except lusid.ApiException as e:
+        except ApiException as e:
             if "PortfolioWithIdAlreadyExists" not in str(e.body):
                 raise e
 
@@ -1089,33 +1037,32 @@ class CocoonTestsHoldings(unittest.TestCase):
         )
 
         # Assert that the unmatched holdings response does not throw an error, and returns an empty list
-        self.assertEqual([], unmatched_holdings_response)
+        assert [] == unmatched_holdings_response
 
         # Delete the portfolio at the end of the test
-        self.api_factory.build(lusid.api.PortfoliosApi).delete_portfolio(
+        self.api_factory.build(lusid.PortfoliosApi).delete_portfolio(
             scope=portfolio_code_and_scope, code=portfolio_code_and_scope
         )
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "file_name, sub_holding_keys, error_name, skip_portfolio",
         [
-            [
-                "Failed load with duplicate shk",
+            (
                 "data/holdings-example-duplicate-shk.csv",
                 ["Security Description"],
                 "DuplicateSubHoldingKeysProvided",
                 False,
-            ],
-            [
-                "Failed with non-existent portfolio",
+            ),
+            (
                 "data/holdings-example-single-holding.csv",
                 ["Security Description"],
                 "PortfolioNotFound",
                 True,
-            ],
-        ]
+            ),
+        ],
     )
     def test_failed_load_from_data_frame_holdings_returns_useful_errors_and_skips_validation_logic(
-        self, _, file_name, sub_holding_keys, error_name, skip_portfolio,
+        self, file_name, sub_holding_keys, error_name, skip_portfolio,
     ) -> None:
         """
         Test that a failed holding upload is handled gracefully by the whole load_from_data_frame function.
@@ -1152,6 +1099,8 @@ class CocoonTestsHoldings(unittest.TestCase):
             "Please resolve all upload errors to check for unmatched items."
         ]
 
+        portfolio_response = None
+
         data_frame = pd.read_csv(Path(__file__).parent.joinpath(file_name))
 
         if not skip_portfolio:
@@ -1170,7 +1119,7 @@ class CocoonTestsHoldings(unittest.TestCase):
             )
 
             # Assert that all portfolios were created without any issues
-            self.assertEqual(len(portfolio_response.get("portfolios").get("errors")), 0)
+            assert len(portfolio_response.get("portfolios").get("errors")) == 0
 
         # Load in the holdings adjustments
         holding_responses = cocoon.cocoon.load_from_data_frame(
@@ -1189,25 +1138,21 @@ class CocoonTestsHoldings(unittest.TestCase):
             return_unmatched_items=return_unmatched_items,
         )
 
-        self.assertEqual(len(holding_responses["holdings"]["success"]), 0)
+        assert len(holding_responses["holdings"]["success"]) == 0
 
-        self.assertEqual(len(holding_responses["holdings"]["errors"]), 1)
+        assert len(holding_responses["holdings"]["errors"]) == 1
 
         # Assert that the ApiError thrown by LUSID is what is expected, given the input data
-        self.assertEqual(
-            json.loads(holding_responses["holdings"]["errors"][0].body)["name"],
-            error_name,
-        )
+        assert json.loads(holding_responses["holdings"]["errors"][0].body)["name"] == error_name
 
         # Assert that there is no 'unmatched_item' field if the input data resulted in no successful uploads
-        self.assertEqual(
-            holding_responses["holdings"].get("unmatched_items"),
-            failed_unmatched_items_check,
-        )
+        assert holding_responses["holdings"].get("unmatched_items") == failed_unmatched_items_check
 
         if not skip_portfolio:
             # Delete the portfolios at the end of the test
+            if portfolio_response is None:
+                raise Exception("Portfolio response cannot be None if skip_portfolio is False")
             for portfolio in portfolio_response.get("portfolios").get("success"):
-                self.api_factory.build(lusid.api.PortfoliosApi).delete_portfolio(
+                self.api_factory.build(lusid.PortfoliosApi).delete_portfolio(
                     scope=scope, code=portfolio.id.code
                 )

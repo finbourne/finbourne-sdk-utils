@@ -1,8 +1,7 @@
 import os
-import unittest
-from parameterized import parameterized
-import lusid
-from pathlib import Path
+import pytest
+import finbourne.sdk.services.lusid as lusid
+from finbourne.sdk.exceptions import ApiException
 import finbourne_sdk_utils.cocoon as cocoon
 import pandas as pd
 import numpy as np
@@ -10,25 +9,26 @@ from finbourne_sdk_utils import logger
 from .mock_api_factory import MockApiFactory
 
 
-class CocoonPropertiesTests(unittest.TestCase):
+class TestCocoonProperties:
     @classmethod
-    def setUpClass(cls) -> None:
+    def setup_class(cls) -> None:
         # Use a mock of the lusid.ApiClientFactory
         cls.api_factory = MockApiFactory( )
         cls.logger = logger.LusidLogger(os.getenv("FBN_LOG_LEVEL", "info"))
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "property_key, expected_outcomes, throws_exception",
         [
-            ["Instrument/default/Figi", [True, "string"]],
-            ["Instrument/default/PropertyThatDoesNotExist", [False, None]],
-            ["Transaction/default/TradeToPortfolioRate", [True, "number"]],
-            ["Transaction/Operations/Strategy", [True, "string"]],
-            ["Holding/Operations/Currency", [True, "currency"]],
-            ["Instrument/default/Forbidden", [False, None]],
-        ]
+            ("Instrument/default/Figi", [True, "string"], False),
+            ("Instrument/default/PropertyThatDoesNotExist", [False, None], False),
+            ("Transaction/default/TradeToPortfolioRate", [True, "number"], False),
+            ("Transaction/Operations/Strategy", [True, "string"], False),
+            ("Holding/Operations/Currency", [True, "currency"], False),
+            ("Instrument/default/Forbidden", [False, None], False),
+        ],
     )
     def test_check_property_definitions_exist_in_scope_single(
-        self, property_key, expected_outcomes, throws_exception=False
+        self, property_key, expected_outcomes, throws_exception
     ) -> None:
         """
         Tests that checking for a property definition in a single scope works as expected. The call to LUSID
@@ -47,15 +47,16 @@ class CocoonPropertiesTests(unittest.TestCase):
                 api_factory=self.api_factory, property_key=property_key
             )
 
-            self.assertEqual(property_existence, expected_outcomes[0])
-            self.assertEqual(property_type, expected_outcomes[1])
-        except lusid.exceptions.ApiException:
-            self.assertEqual(throws_exception, True)
+            assert property_existence == expected_outcomes[0]
+            assert property_type == expected_outcomes[1]
+        except ApiException:
+            assert throws_exception
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "scope, domain, data_frame, property_columns, expected_outcome",
         [
             # Check for two properties which don't exist and one that does with a type of string
-            [
+            (
                 "default",
                 "Instrument",
                 pd.DataFrame(
@@ -76,9 +77,9 @@ class CocoonPropertiesTests(unittest.TestCase):
                         },
                     ),
                 ],
-            ],
+            ),
             # Check for one property that exists with a currency type and one that does not exist
-            [
+            (
                 "Operations",
                 "Holding",
                 pd.DataFrame(
@@ -97,8 +98,8 @@ class CocoonPropertiesTests(unittest.TestCase):
                         }
                     ),
                 ],
-            ],
-        ]
+            ),
+        ],
     )
     def test_check_property_definitions_exist_in_scope(
         self, scope, domain, data_frame, property_columns, expected_outcome
@@ -125,16 +126,17 @@ class CocoonPropertiesTests(unittest.TestCase):
             column_to_scope={column: scope for column in property_columns},
         )
 
-        self.assertEqual(first=len(missing_columns), second=len(set(missing_columns)))
+        assert len(missing_columns) == len(set(missing_columns))
 
-        self.assertEqual(first=set(missing_columns), second=set(expected_outcome[0]))
+        assert set(missing_columns) == set(expected_outcome[0])
 
-        self.assertTrue(expr=updated_data_frame.equals(expected_outcome[1]))
+        assert updated_data_frame.equals(expected_outcome[1])
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "scope, domain, data_frame, missing_property_columns, expected_outcome",
         [
             # Test that a missing property is created as expected
-            [
+            (
                 "CreditRating",
                 "Instrument",
                 pd.DataFrame(
@@ -165,9 +167,9 @@ class CocoonPropertiesTests(unittest.TestCase):
                         ]
                     ),
                 ],
-            ],
+            ),
             # Test that a property with all null values has a definition created as a string not a number
-            [
+            (
                 "CreditRating",
                 "Instrument",
                 pd.DataFrame(
@@ -199,8 +201,8 @@ class CocoonPropertiesTests(unittest.TestCase):
                         dtype=object,
                     ),
                 ],
-            ],
-        ]
+            ),
+        ],
     )
     def test_create_property_definitions_from_file(
         self, scope, domain, data_frame, missing_property_columns, expected_outcome
@@ -227,31 +229,32 @@ class CocoonPropertiesTests(unittest.TestCase):
             column_to_scope={column: scope for column in missing_property_columns},
         )
 
-        self.assertEqual(first=property_key_mapping, second=expected_outcome[0])
+        assert property_key_mapping == expected_outcome[0]
 
-        self.assertTrue(expr=data_frame_updated.equals(expected_outcome[1]))
+        assert data_frame_updated.equals(expected_outcome[1])
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "row, scope, domain, dtypes, expected_outcome",
         [
             # Test creating property values in the instrument domain
-            [
+            (
                 pd.Series(data=["A2", "A-"], index=["Moodys", "S&P"]),
                 "CreditRating",
                 "Instrument",
                 pd.Series(data=["object", "object"], index=["Moodys", "S&P"]),
                 [
-                    lusid.models.PerpetualProperty(
+                    lusid.ModelProperty(
                         key="Instrument/CreditRating/Moodys",
-                        value=lusid.models.PropertyValue(label_value="A2"),
+                        value=lusid.PropertyValue(label_value="A2"),
                     ),
-                    lusid.models.PerpetualProperty(
+                    lusid.ModelProperty(
                         key="Instrument/CreditRating/SandP",
-                        value=lusid.models.PropertyValue(label_value="A-"),
+                        value=lusid.PropertyValue(label_value="A-"),
                     ),
                 ],
-            ],
+            ),
             # Test creating property values in the transaction domain, including a metric value property
-            [
+            (
                 pd.Series(
                     data=["TD_1241247", 30], index=["TraderId", "Rebalancing_Interval"]
                 ),
@@ -262,19 +265,19 @@ class CocoonPropertiesTests(unittest.TestCase):
                     index=["TraderId", "Rebalancing_Interval"],
                 ),
                 {
-                    "Transaction/Operations/TraderId": lusid.models.PerpetualProperty(
+                    "Transaction/Operations/TraderId": lusid.PerpetualProperty(
                         key="Transaction/Operations/TraderId",
-                        value=lusid.models.PropertyValue(label_value="TD_1241247"),
+                        value=lusid.PropertyValue(label_value="TD_1241247"),
                     ),
-                    "Transaction/Operations/Rebalancing_Interval": lusid.models.PerpetualProperty(
+                    "Transaction/Operations/Rebalancing_Interval": lusid.PerpetualProperty(
                         key="Transaction/Operations/Rebalancing_Interval",
-                        value=lusid.models.PropertyValue(
-                            metric_value=lusid.models.MetricValue(value=30)
+                        value=lusid.PropertyValue(
+                            metric_value=lusid.MetricValue(value=30)
                         ),
                     ),
                 },
-            ],
-        ]
+            ),
+        ],
     )
     def test_create_property_values(
         self, row, scope, domain, dtypes, expected_outcome
@@ -285,7 +288,7 @@ class CocoonPropertiesTests(unittest.TestCase):
         :param str scope:
         :param str domain:
         :param pd.Series dtypes:
-        :param list[lusid.models.PerpetualProperty] expected_outcome:
+        :param list[lusid.PerpetualProperty] expected_outcome:
 
         :return: None
         """
@@ -294,58 +297,56 @@ class CocoonPropertiesTests(unittest.TestCase):
             row=row, column_to_scope={}, scope=scope, domain=domain, dtypes=dtypes
         )
 
-        self.assertEqual(first=property_values, second=expected_outcome)
+        assert property_values == expected_outcome
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "description, partial_keys, properties_scope, domain, expected_outcome",
         [
-            [
+            (
                 "Just a code",
                 ["Strategy"],
                 "Traders",
                 "Transaction",
                 ["Transaction/Traders/Strategy"],
-            ],
-            [
+            ),
+            (
                 "A scope and code",
                 ["Signal/Strategy"],
                 "Traders",
                 "Transaction",
                 ["Transaction/Signal/Strategy"],
-            ],
-            [
+            ),
+            (
                 "A full key",
                 ["Portfolio/Signal/Strategy"],
                 "Traders",
                 "Transaction",
                 ["Portfolio/Signal/Strategy"],
-            ],
-            [
+            ),
+            (
                 "A scope which is the same as the domain",
                 ["Transaction/Strategy"],
                 "Traders",
                 "Transaction",
                 ["Transaction/Transaction/Strategy"],
-            ],
-        ]
+            ),
+        ],
     )
     def test_infer_full_property_keys(
-        self, _, partial_keys, properties_scope, domain, expected_outcome
+        self, description, partial_keys, properties_scope, domain, expected_outcome
     ):
 
         full_keys = cocoon.properties._infer_full_property_keys(
             partial_keys=partial_keys, properties_scope=properties_scope, domain=domain
         )
 
-        self.assertEqual(
-            first=expected_outcome,
-            second=full_keys,
-            msg="The full keys don't matched the expected outcome",
-        )
+        assert full_keys == expected_outcome
+
     def test_create_property_definitions_with_leading_nulls(self):
         """
         Tests that property definitions are created with correct data types
         even when columns have leading null values.
-        
+
         The function should find the first non-null value and infer the type
         from that, rather than defaulting to string for columns with null headers.
         """
@@ -388,29 +389,20 @@ class CocoonPropertiesTests(unittest.TestCase):
         )
 
         # Validate that properties were created
-        self.assertEqual(len(property_key_mapping), 3)
-        self.assertIn("Name", property_key_mapping)
-        self.assertIn("Count", property_key_mapping)
-        self.assertIn("Rating", property_key_mapping)
+        assert len(property_key_mapping) == 3
+        assert "Name" in property_key_mapping
+        assert "Count" in property_key_mapping
+        assert "Rating" in property_key_mapping
 
         # Validate property keys were created correctly
-        self.assertEqual(
-            property_key_mapping["Name"],
-            "Instrument/default/Name"
-        )
-        self.assertEqual(
-            property_key_mapping["Count"],
-            "Instrument/default/Count"
-        )
-        self.assertEqual(
-            property_key_mapping["Rating"],
-            "Instrument/default/Rating"
-        )
+        assert property_key_mapping["Name"] == "Instrument/default/Name"
+        assert property_key_mapping["Count"] == "Instrument/default/Count"
+        assert property_key_mapping["Rating"] == "Instrument/default/Rating"
 
         # Validate that the DataFrame data types were inferred correctly
         # Count should be int64 or float64 (numeric)
-        self.assertIn(str(updated_data_frame["Count"].dtype), ["int64", "float64"])
+        assert str(updated_data_frame["Count"].dtype) in ["int64", "float64"]
         # Rating should be float64 (numeric)
-        self.assertEqual(str(updated_data_frame["Rating"].dtype), "float64")
+        assert str(updated_data_frame["Rating"].dtype) == "float64"
         # Name should remain object (string)
-        self.assertEqual(str(updated_data_frame["Name"].dtype), "object")
+        assert str(updated_data_frame["Name"].dtype) == "object"

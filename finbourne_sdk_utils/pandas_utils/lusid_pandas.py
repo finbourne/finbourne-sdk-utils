@@ -1,12 +1,13 @@
 import pandas as pd
 from flatten_json import flatten
 import logging
+from typing import Any
 
 logger = logging.getLogger()
 
 
 def lusid_response_to_data_frame(
-    lusid_response, rename_properties: bool = False, column_name_mapping: dict = None
+    lusid_response: Any, rename_properties: bool = False, column_name_mapping: dict | None = None
 ):
     """
     This function takes a LUSID API response and attempts to convert the response into a Pandas DataFrame or Series.
@@ -38,10 +39,10 @@ def lusid_response_to_data_frame(
 
     # Check if lusid_response is a list of the same objects which all have to_dict() method
 
-    if type(lusid_response) == list and len(lusid_response) == 0:
+    if isinstance(lusid_response, list) and len(lusid_response) == 0:
         return pd.DataFrame()
 
-    elif type(lusid_response) == list and len(lusid_response) > 0:
+    elif isinstance(lusid_response, list) and len(lusid_response) > 0:
 
         first_item_type = type(lusid_response[0])
 
@@ -57,10 +58,10 @@ def lusid_response_to_data_frame(
 
     # Check if lusid_response has a values attribute with data type of list
 
-    elif hasattr(lusid_response, "values") and type(lusid_response.values) == list:
+    elif hasattr(lusid_response, "values") and isinstance(getattr(lusid_response, "values"), list):
 
         response_df = pd.DataFrame(
-            flatten(value.to_dict(), ".") for value in lusid_response.values
+            flatten(value.to_dict(), ".") for value in getattr(lusid_response, "values")
         )
 
     # Check if response object has to_dict() method
@@ -68,9 +69,9 @@ def lusid_response_to_data_frame(
     elif hasattr(lusid_response, "to_dict"):
 
         response_df = pd.DataFrame.from_dict(
-            (flatten(lusid_response.to_dict(), ".")),
+            (flatten(getattr(lusid_response, "to_dict")(), ".")),
             orient="index",
-            columns=["response_values"],
+            columns=pd.Index(["response_values"]),
         )
     else:
 

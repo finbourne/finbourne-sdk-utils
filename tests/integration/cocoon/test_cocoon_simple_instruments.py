@@ -1,17 +1,15 @@
-import os
-import unittest
 import pandas as pd
 from finbourne_sdk_utils import cocoon as cocoon
-import lusid
+from finbourne.sdk.extensions import SyncApiClientFactory
 
-class CocoonTestsSimpleInstruments(unittest.TestCase):
+class TestCocoonSimpleInstruments:
     @classmethod
-    def setUpClass(cls) -> None:
+    def setup_class(cls) -> None:
 
-        cls.api_factory = lusid.SyncApiClientFactory()
+        cls.api_factory = SyncApiClientFactory()
 
     def test_load_simple_instrument_properties(self,):
-         
+
         data_frame = pd.DataFrame(
             {
                 "Security" : [
@@ -35,8 +33,8 @@ class CocoonTestsSimpleInstruments(unittest.TestCase):
                     "Equity",
                     "Equity",
                     "Equity",
-                    "Equity",     
-                    "Equity",     
+                    "Equity",
+                    "Equity",
                 ],
                 "Mkt Price" : [
                     150.01,
@@ -44,7 +42,7 @@ class CocoonTestsSimpleInstruments(unittest.TestCase):
                     88.4,
                     370.87,
                     291.27,
-                    78.09            
+                    78.09
                 ],
                 "Cusip" : [
                     "02079K107",
@@ -52,7 +50,7 @@ class CocoonTestsSimpleInstruments(unittest.TestCase):
                     "254687106",
                     "437076102",
                     "580135101",
-                    "654106103"           
+                    "654106103"
                 ],
                 "Sector" : [
                     "Communication Services",
@@ -60,7 +58,7 @@ class CocoonTestsSimpleInstruments(unittest.TestCase):
                     "Communication Services",
                     "Consumer Discretionary",
                     "Consumer Discretionary",
-                    "Consumer Discretionary"            
+                    "Consumer Discretionary"
                 ],
                 "Yield" : [
                     0.0053,
@@ -68,7 +66,7 @@ class CocoonTestsSimpleInstruments(unittest.TestCase):
                     0.0085,
                     0.0243,
                     0.0229,
-                    0.019           
+                    0.019
                 ],
                 "Level 1" : [
                     "Risk Assets",
@@ -135,6 +133,5 @@ class CocoonTestsSimpleInstruments(unittest.TestCase):
             property_columns=instrument_mapping["properties"]
         )
 
-        self.assertEqual(len(responses["instruments"]["success"]), 1)
-        self.assertEqual(len(responses["instruments"]["errors"]), 0)
-     
+        assert len(responses["instruments"]["success"]) == 1
+        assert len(responses["instruments"]["errors"]) == 0

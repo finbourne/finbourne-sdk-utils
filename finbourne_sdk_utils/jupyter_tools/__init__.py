@@ -1,2 +1,2 @@
-from finbourne_sdk_utils.jupyter_tools.stop_execution import StopExecution
-from finbourne_sdk_utils.jupyter_tools.hide_code_button import toggle_code
+from finbourne_sdk_utils.jupyter_tools.stop_execution import StopExecution as StopExecution
+from finbourne_sdk_utils.jupyter_tools.hide_code_button import toggle_code as toggle_code

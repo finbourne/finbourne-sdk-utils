@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from finbourne_sdk_utils.cocoon import checkargs
-from lusid.exceptions import ApiException
+from finbourne.sdk.exceptions import ApiException
 from flatten_json import flatten
 
 
@@ -151,7 +151,7 @@ def get_errors_from_response(
     # transpose list of lists for insertion to dataframe
     items_error = np.array(items_list).T.tolist()
 
-    return pd.DataFrame(items_error, columns=column_names)
+    return pd.DataFrame(items_error, columns=pd.Index(column_names))
 
 
 def get_portfolio_from_href(href: list, file_type: str):
@@ -288,7 +288,7 @@ def format_portfolios_response(
         response[file_type]["errors"], extended_error_details
     )
 
-    return (pd.DataFrame(items_success, columns=["successful items"]), errors)
+    return (pd.DataFrame(items_success, columns=pd.Index(["successful items"])), errors)
 
 
 def format_transactions_response(
@@ -329,7 +329,7 @@ def format_transactions_response(
     return (
         pd.DataFrame(
             get_portfolio_from_href(items_success, file_type),
-            columns=["successful items"],
+            columns=pd.Index(["successful items"]),
         ),
         errors,
     )
@@ -373,7 +373,7 @@ def format_holdings_response(
     return (
         pd.DataFrame(
             get_portfolio_from_href(items_success, file_type),
-            columns=["successful items"],
+            columns=pd.Index(["successful items"]),
         ),
         errors,
     )
@@ -452,4 +452,4 @@ def format_reference_portfolios_response(
         response[file_type]["errors"], extended_error_details
     )
 
-    return (pd.DataFrame(items_success, columns=["successful items"]), errors)
+    return (pd.DataFrame(items_success, columns=pd.Index(["successful items"])), errors)

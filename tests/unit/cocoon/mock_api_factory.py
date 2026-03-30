@@ -1,14 +1,19 @@
 from http import HTTPStatus
 
-import lusid
+import finbourne.sdk.services.lusid as lusid
+from finbourne.sdk.extensions import SyncApiClientFactory
+from finbourne.sdk.exceptions import ApiException
 
 
-class MockApiFactory(lusid.SyncApiClientFactory):
+class MockApiFactory(SyncApiClientFactory):
     """
     This is a mock of the lusid.SyncApiClientFactory class
     """
 
-    def build(self, api):
+    def __init__(self):
+        pass  # Skip parent __init__ which requires OAuth credentials
+
+    def build(self, api):  # type: ignore[override]
         """
         Creates and returns appropriate Mock for api passed in
         supports:
@@ -28,17 +33,17 @@ class MockApiFactory(lusid.SyncApiClientFactory):
 
         def create_property_definition(
             self, create_property_definition_request
-        ) -> lusid.models.PropertyDefinition:
+        ) -> lusid.PropertyDefinition:
             """
             This mocks the creation of a portfolio definition
 
-            :param lusid.models.CreatePropertyDefinitionRequest create_property_definition_request: The create property definition request
+            :param lusid.CreatePropertyDefinitionRequest create_property_definition_request: The create property definition request
             :param kwargs:
-            :return: lusid.models.PropertyDefinition: The property defintion of the created property
+            :return: lusid.PropertyDefinition: The property defintion of the created property
             """
-            return lusid.models.PropertyDefinition(
+            return lusid.PropertyDefinition(
                 key=f"{create_property_definition_request.domain}/{create_property_definition_request.scope}/{create_property_definition_request.code}",
-                data_type_id=lusid.models.ResourceId(
+                data_type_id=lusid.ResourceId(
                     scope=create_property_definition_request.data_type_id.scope,
                     code=create_property_definition_request.data_type_id.code,
                 ),
@@ -46,7 +51,7 @@ class MockApiFactory(lusid.SyncApiClientFactory):
 
         def get_property_definition(
             self, domain, scope, code
-        ) -> lusid.models.PropertyDefinition:
+        ) -> lusid.PropertyDefinition:
             """
             This mocks the call to get a property definition
 
@@ -55,32 +60,32 @@ class MockApiFactory(lusid.SyncApiClientFactory):
             :param code: The code of the property
             :param kwargs:
 
-            :return: lusid.models.PropertyDefinition any: The property definition of the property if it exists
+            :return: lusid.PropertyDefinition any: The property definition of the property if it exists
             """
             # Construct the property key
             property_key = f"{domain}/{scope}/{code}"
 
             # A static representation of the property definitions that exist
             property_keys_in_existance = {
-                "Instrument/default/Figi": lusid.models.ResourceId(
+                "Instrument/default/Figi": lusid.ResourceId(
                     scope="system", code="string"
                 ),
-                "Transaction/default/TradeToPortfolioRate": lusid.models.ResourceId(
+                "Transaction/default/TradeToPortfolioRate": lusid.ResourceId(
                     scope="system", code="number"
                 ),
-                "Transaction/Operations/Strategy": lusid.models.ResourceId(
+                "Transaction/Operations/Strategy": lusid.ResourceId(
                     scope="system", code="string"
                 ),
-                "Holding/Operations/Currency": lusid.models.ResourceId(
+                "Holding/Operations/Currency": lusid.ResourceId(
                     scope="system", code="currency"
                 ),
             }
 
             # If the property exists return the defintion, else raise an exception
             if property_key in list(property_keys_in_existance.keys()):
-                return lusid.models.PropertyDefinition(
+                return lusid.PropertyDefinition(
                     key=property_key,
                     data_type_id=property_keys_in_existance[property_key],
                 )
             else:
-                raise lusid.exceptions.ApiException(status=HTTPStatus.NOT_FOUND)
+                raise ApiException(status=HTTPStatus.NOT_FOUND)

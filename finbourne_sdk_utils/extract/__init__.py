@@ -1,1 +1,1 @@
-from finbourne_sdk_utils.extract.group_holdings import get_holdings_for_group
+from finbourne_sdk_utils.extract.group_holdings import get_holdings_for_group as get_holdings_for_group

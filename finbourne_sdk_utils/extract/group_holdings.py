@@ -1,5 +1,6 @@
 from finbourne_sdk_utils.cocoon.async_tools import run_in_executor, ThreadPool
-import lusid
+import finbourne.sdk.services.lusid as lusid
+from finbourne.sdk.extensions import SyncApiClientFactory
 import asyncio
 from functools import reduce
 from typing import Dict, List
@@ -10,10 +11,10 @@ from finbourne_sdk_utils.cocoon.async_tools import (
 
 
 def _join_holdings(
-    holdings_to_join: Dict[str, List[lusid.models.PortfolioHolding]],
+    holdings_to_join: Dict[str, List[lusid.PortfolioHolding]],
     group_by_portfolio: bool = False,
     dict_key="GroupHoldings",
-) -> Dict[str, List[lusid.models.PortfolioHolding]]:
+) -> Dict[str, List[lusid.PortfolioHolding]]:
     """
     This function joins the holdings together from multiple Portfolios into a single list of PortfolioHolding
 
@@ -25,7 +26,7 @@ def _join_holdings(
 
     Parameters
     ----------
-    holdings_to_join : Dict[str, List[lusid.models.PortfolioHolding]
+    holdings_to_join : Dict[str, List[lusid.PortfolioHolding]
         The dictionary of lists of PortfolioHolding keyed by the unique combination of Scope and Code
         for the Portfolio Group or Portfolios. These will either be returned as is or joined to form a new dictionary
         with a single key against a single list of PortfolioHolding.
@@ -38,7 +39,7 @@ def _join_holdings(
 
     Returns
     -------
-    holdings_joined : Dict[str, List[lusid.models.PortfolioHolding]
+    holdings_joined : Dict[str, List[lusid.PortfolioHolding]
         The joined dictionary of a list of PortfolioHolding which either has a single key for the Portfolio
         Group or a key for each Portfolio in the group
     """
@@ -70,7 +71,7 @@ def _join_holdings(
     # Reduce the list of holdings against each key to a single holding
     for key, value in all_holdings_keyed.items():
         joined_holdings.append(
-            lusid.models.PortfolioHolding(
+            lusid.PortfolioHolding(
                 # Use the instrument_uid from the key
                 instrument_uid=key.split(":")[0],
                 # Use the holding type from the key
@@ -80,14 +81,14 @@ def _join_holdings(
                 settled_units=reduce(
                     (lambda x, y: x + y), list(map(lambda x: x.settled_units, value))
                 ),
-                cost=lusid.models.CurrencyAndAmount(
+                cost=lusid.CurrencyAndAmount(
                     # Use the currency form the key
                     currency=key.split(":")[2],
                     amount=reduce(
                         (lambda x, y: x + y), list(map(lambda x: x.cost.amount, value))
                     ),
                 ),
-                cost_portfolio_ccy=lusid.models.CurrencyAndAmount(
+                cost_portfolio_ccy=lusid.CurrencyAndAmount(
                     # Use the first currency, these holdings could be from different portfolios, so the validity of this is questionable
                     currency=value[0].cost_portfolio_ccy.currency,
                     amount=reduce(
@@ -109,14 +110,14 @@ def _join_holdings(
 
 @run_in_executor
 def _get_portfolio_group(
-    api_factory: lusid.SyncApiClientFactory, scope: str, code: str, **kwargs
-) -> lusid.models.PortfolioGroup:
+    api_factory: SyncApiClientFactory, scope: str, code: str, **kwargs
+) -> lusid.PortfolioGroup:
     """
     This function gets a Portfolio Group from LUSID.
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory
+    api_factory : SyncApiClientFactory
         The api factory to use
     scope : str
         The scope of the Portfolio Group
@@ -125,7 +126,7 @@ def _get_portfolio_group(
 
     Returns
     -------
-    response : lusid.models.PortfolioGroup
+    response : lusid.PortfolioGroup
         The Portfolio Group
 
     Other Parameters
@@ -144,21 +145,21 @@ def _get_portfolio_group(
     }
 
     # Call LUSID to get the portfolio group
-    response = api_factory.build(lusid.api.PortfolioGroupsApi).get_portfolio_group(scope=scope, code=code, **lusid_keyword_arguments)
+    response = api_factory.build(lusid.PortfolioGroupsApi).get_portfolio_group(scope=scope, code=code, **lusid_keyword_arguments)
 
     return response
 
 
 @run_in_executor
 def _get_portfolio_holdings(
-    api_factory: lusid.SyncApiClientFactory, scope: str, code: str, **kwargs
-) -> Dict[str, List[lusid.models.PortfolioHolding]]:
+    api_factory: SyncApiClientFactory, scope: str, code: str, **kwargs
+) -> Dict[str, List[lusid.PortfolioHolding]]:
     """
     This function gets the holdings of a Portfolio from LUSID.
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory
+    api_factory : SyncApiClientFactory
         The api factory to use
     scope : str
         The scope of the Portfolio
@@ -174,7 +175,7 @@ def _get_portfolio_holdings(
 
     Returns
     -------
-    response : Dict[str, List[lusid.models.PortfolioHolding]]
+    response : Dict[str, List[lusid.PortfolioHolding]]
         The list of PortfolioHolding keyed by the unique combination of the Portfolio's scope and code
 
     Other Parameters
@@ -201,26 +202,26 @@ def _get_portfolio_holdings(
     }
 
     # Call LUSID to get the holdings for the Portfolio
-    response = api_factory.build(lusid.api.TransactionPortfoliosApi).get_holdings(scope=scope, code=code, **lusid_keyword_arguments)
+    response = api_factory.build(lusid.TransactionPortfoliosApi).get_holdings(scope=scope, code=code, **lusid_keyword_arguments)
 
     # Key the response with the unique scope/code combination
     return {f"{scope} : {code}": response.values}
 
 
 async def _get_holdings_for_group_recursive(
-    api_factory: lusid.SyncApiClientFactory,
+    api_factory: SyncApiClientFactory,
     group_scope: str,
     group_code: str,
     group_by_portfolio=False,
     **kwargs,
-) -> Dict[str, List[lusid.models.PortfolioHolding]]:
+) -> Dict[str, List[lusid.PortfolioHolding]]:
     """
     This function recursively gets the holdings for a Portfolio Group in LUSID by making a request to get the holdings for
     each sub-group and portofolio and then joining the results together above the API.
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory
+    api_factory : SyncApiClientFactory
         The api factory to use
     group_scope : str
         The scope of the Portfolio Group
@@ -231,7 +232,7 @@ async def _get_holdings_for_group_recursive(
 
     Returns
     -------
-    Dict[str, List[lusid.models.PortfolioHolding]]
+    Dict[str, List[lusid.PortfolioHolding]]
         The single set of holdings
 
     Other Parameters
@@ -251,7 +252,7 @@ async def _get_holdings_for_group_recursive(
     """
 
     # Get the details for the Portfolio Group including its sub-group and Portfolio members
-    response = await _get_portfolio_group(
+    response = await _get_portfolio_group(  # type: ignore[misc]
         api_factory, group_scope, group_code, **kwargs
     )
     portfolios = response.portfolios
@@ -260,13 +261,13 @@ async def _get_holdings_for_group_recursive(
     # Get the holdings for each portfolio
     portfolio_holdings = await asyncio.gather(
         *[
-            _get_portfolio_holdings(
+            _get_portfolio_holdings(  # type: ignore[arg-type]
                 api_factory=api_factory,
                 scope=portfolio.scope,
                 code=portfolio.code,
                 **kwargs,
             )
-            for portfolio in portfolios
+            for portfolio in (portfolios or [])
         ],
         return_exceptions=False,
     )
@@ -282,7 +283,7 @@ async def _get_holdings_for_group_recursive(
     )
 
     # If there aren't any sub-groups return these joined holdings
-    if len(sub_groups) == 0:
+    if len(sub_groups or []) == 0:
         return joined_portfolio_holdings
     # Otherwise get the joined holdings for the sub-groups
     else:
@@ -295,7 +296,7 @@ async def _get_holdings_for_group_recursive(
                     group_by_portfolio=group_by_portfolio,
                     **kwargs,
                 )
-                for sub_group in sub_groups
+                for sub_group in (sub_groups or [])
             ],
             return_exceptions=False,
         )
@@ -333,19 +334,19 @@ async def _get_holdings_for_group_recursive(
 
 
 def get_holdings_for_group(
-    api_factory: lusid.SyncApiClientFactory,
+    api_factory: SyncApiClientFactory,
     group_scope: str,
     group_code: str,
     group_by_portfolio: bool = False,
     num_threads=5,
     **kwargs,
-) -> Dict[str, List[lusid.models.PortfolioHolding]]:
+) -> Dict[str, List[lusid.PortfolioHolding]]:
     """
     This function gets the holdings for a Portfolio Group in LUSID.
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory
+    api_factory : SyncApiClientFactory
         The api factory to use
     group_scope : str
         The scope of the Portfolio Group
@@ -358,7 +359,7 @@ def get_holdings_for_group(
 
     Returns
     -------
-    group_holdings : Dict[str, List[lusid.models.PortfolioHolding]]
+    group_holdings : Dict[str, List[lusid.PortfolioHolding]]
         The single set of holdings either keyed by the Portfolio scope/code or the Portfolio Group scope/code
 
     Other Parameters

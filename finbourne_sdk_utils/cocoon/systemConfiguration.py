@@ -1,4 +1,4 @@
-import lusid
+import finbourne.sdk.services.lusid as lusid
 
 
 def set_transaction_mapping(client, transaction_mapping):
@@ -14,7 +14,7 @@ def set_transaction_mapping(client, transaction_mapping):
 
     Returns
     -------
-    response : lusid.models.ResourceListOfTransactionConfigurationData
+    response : lusid.ResourceListOfTransactionConfigurationData
         The response from LUSID
     """
 
@@ -31,7 +31,7 @@ def set_transaction_mapping(client, transaction_mapping):
         for alias in configuration["aliases"]:
             # Append the alias to your list
             aliases.append(
-                lusid.models.TransactionConfigurationTypeAlias(
+                lusid.TransactionConfigurationTypeAlias(
                     type=alias["type"],
                     description=alias["description"],
                     transaction_class=alias["transactionClass"],
@@ -49,16 +49,16 @@ def set_transaction_mapping(client, transaction_mapping):
             # Add properties if they exist in the config
             if len(movement["properties"]) > 0:
                 key = movement["properties"][0]["key"]
-                value = lusid.models.PropertyValue(
+                value = lusid.PropertyValue(
                     label_value=movement["properties"][0]["value"]
                 )
-                properties = {key: lusid.models.PerpetualProperty(key=key, value=value)}
+                properties = {key: lusid.PerpetualProperty(key=key, value=value)}
             else:
                 properties = {}
 
             if len(movement["mappings"]) > 0:
                 mappings = [
-                    lusid.models.TransactionPropertyMappingRequest(
+                    lusid.TransactionPropertyMappingRequest(
                         property_key=movement["mappings"][0]["propertyKey"],
                         set_to=movement["mappings"][0]["setTo"],
                     )
@@ -68,7 +68,7 @@ def set_transaction_mapping(client, transaction_mapping):
 
             # Append the movement to your list
             movements.append(
-                lusid.models.TransactionConfigurationMovementDataRequest(
+                lusid.TransactionConfigurationMovementDataRequest(
                     movement_types=movement["movementTypes"],
                     side=movement["side"],
                     direction=movement["direction"],
@@ -79,7 +79,7 @@ def set_transaction_mapping(client, transaction_mapping):
 
         # Build your configuration for this transaction type
         configuration_requests.append(
-            lusid.models.TransactionConfigurationDataRequest(
+            lusid.TransactionConfigurationDataRequest(
                 aliases=aliases, movements=movements, properties=None
             )
         )

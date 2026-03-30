@@ -1,7 +1,7 @@
-import unittest
-from pathlib import Path
-import lusid
-import lusid.models as models
+import finbourne.sdk.services.lusid as lusid
+import finbourne.sdk.services.lusid.models as models
+from finbourne.sdk.extensions import SyncApiClientFactory
+from finbourne.sdk.exceptions import ApiException
 
 from finbourne_sdk_utils.cocoon.utilities import create_scope_id
 from finbourne_sdk_utils.cocoon.transaction_type_upload import upsert_transaction_type_alias
@@ -16,15 +16,14 @@ type_which_does_not_exist = create_scope_id()
 txn_type_source = "LPT_TXN_CFG_TESTS"
 
 
-class CocoonTestTransactionTypeUpload(unittest.TestCase):
+class TestCocoonTransactionTypeUpload:
     @classmethod
-    def setUpClass(cls) -> None:
+    def setup_class(cls) -> None:
 
-        secrets_file = Path(__file__).parent.parent.parent.joinpath("secrets.json")
-        cls.api_factory = lusid.SyncApiClientFactory()
+        cls.api_factory = SyncApiClientFactory()
         
         cls.system_configuration_api = cls.api_factory.build(
-            lusid.api.SystemConfigurationApi
+            lusid.SystemConfigurationApi
         )
 
         cls.class_transaction_type_config = [
@@ -99,12 +98,12 @@ class CocoonTestTransactionTypeUpload(unittest.TestCase):
             try:
 
                 cls.create_transaction_response = cls.system_configuration_api.create_configuration_transaction_type(
-                    transaction_configuration_data_request=trans_type
+                    transaction_configuration_data_request=trans_type  # type: ignore[arg-type]
                 )
 
-            except lusid.exceptions.ApiException as e:
-                if json.loads(e.body)["code"] == 231:
-                    logger.info(json.loads(e.body)["title"])
+            except ApiException as e:
+                if json.loads(e.body or "{}")["code"] == 231:
+                    logger.info(json.loads(e.body or "{}")["title"])
 
     def test_update_current_alias_with_new_movements(self):
 
@@ -125,7 +124,7 @@ class CocoonTestTransactionTypeUpload(unittest.TestCase):
                 if alias.type == new_movements_alias.aliases[0].type and alias.source == txn_type_source:
                     uploaded_alias.append(trans_type)
 
-        self.assertEqual(uploaded_alias[0], new_movements_alias)
+        assert uploaded_alias[0] == new_movements_alias
         
     def test_update_alias_which_does_not_exist(self):
 
@@ -145,7 +144,7 @@ class CocoonTestTransactionTypeUpload(unittest.TestCase):
                 if alias.type == alias_which_does_not_exist.aliases[0].type and alias.source == txn_type_source:
                     uploaded_alias.append(trans_type)
 
-        self.assertEqual(uploaded_alias[0], alias_which_does_not_exist)
+        assert uploaded_alias[0] == alias_which_does_not_exist
 
 
     def test_update_multiple_current_alias_with_new_movements(self):
@@ -173,4 +172,4 @@ class CocoonTestTransactionTypeUpload(unittest.TestCase):
                 if alias.type in [new_buy_transaction_type, new_sell_transaction_type] and alias.source == txn_type_source:
                     uploaded_alias.append(trans_type)
 
-        self.assertEqual(uploaded_alias, trans_type_with_multiple_alias)
+        assert uploaded_alias == trans_type_with_multiple_alias

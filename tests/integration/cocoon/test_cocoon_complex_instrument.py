@@ -1,24 +1,24 @@
 import os
-import unittest
+import pytest
 from pathlib import Path
 import pandas as pd
 
 from finbourne_sdk_utils import cocoon as cocoon
-from parameterized import parameterized
-import lusid
-import lusid.models as models
+import finbourne.sdk.services.lusid as lusid
+import finbourne.sdk.services.lusid.models as models
+from finbourne.sdk.extensions import SyncApiClientFactory
 
 from finbourne_sdk_utils import logger
 from datetime import datetime
 import pytz
 
 
-class ComplexInstrumentTests(unittest.TestCase):
+class TestComplexInstrument:
     @classmethod
-    def setUpClass(cls):
-        cls.api_factory = lusid.SyncApiClientFactory()
+    def setup_class(cls):
+        cls.api_factory = SyncApiClientFactory()
         cls.logger = logger.LusidLogger(os.getenv("FBN_LOG_LEVEL", "info"))
-        cls.instruments_api = cls.api_factory.build(lusid.api.InstrumentsApi)
+        cls.instruments_api = cls.api_factory.build(lusid.InstrumentsApi)
 
         # Set test parameters as class methods
         cls.scope = "TestScope"
@@ -87,7 +87,7 @@ class ComplexInstrumentTests(unittest.TestCase):
 
         return self.instruments_api.upsert_instruments(instrument_request)
 
-    @unittest.skip("Also failed on the original V1, fixup later")
+    @pytest.mark.skip("Also failed on the original V1, fixup later")
     def test_load_from_dataframe_bond_v1_fail(self) -> None:
         """
             Test that instruments can be loaded successfully using load_from_data_frame()
@@ -125,25 +125,19 @@ class ComplexInstrumentTests(unittest.TestCase):
             instrument_name_enrichment=True,
         )
 
-        self.assertEqual(
-            first=sum(
-                [
-                    len(response.values)
-                    for response in responses["instruments"]["success"]
-                ]
-            ),
-            second=len(data_frame["Client Internal"].unique()),
-        )
+        assert sum(
+            [
+                len(response.values)
+                for response in responses["instruments"]["success"]
+            ]
+        ) == len(data_frame["Client Internal"].unique())
 
-        self.assertEqual(
-            first=sum(
-                [
-                    len(response.failed)
-                    for response in responses["instruments"]["success"]
-                ]
-            ),
-            second=0,
-        )
+        assert sum(
+            [
+                len(response.failed)
+                for response in responses["instruments"]["success"]
+            ]
+        ) == 0
 
         # Clean and aggregate successful responses into a dictionary
         combined_successes = {
@@ -153,12 +147,10 @@ class ComplexInstrumentTests(unittest.TestCase):
         }
 
         # Check instrument definition in response matches expected outcome
-        for key in expected_outcome.values.keys():
+        expected_values = expected_outcome.values or {}
+        for key in expected_values.keys():
             response_obj = combined_successes[key]
-            self.assertEqual(
-                response_obj.instrument_definition,
-                expected_outcome.values[key].instrument_definition,
-            )
+            assert response_obj.instrument_definition == expected_values[key].instrument_definition
 
     def test_load_from_dataframe_with_unsupported_inst_type(self) -> None:
         """
@@ -188,7 +180,7 @@ class ComplexInstrumentTests(unittest.TestCase):
         data_frame["Instrument Type"].replace("Bond", "Foo", inplace=True)
 
         # Check that ValueError is raised
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             cocoon.cocoon.load_from_data_frame(
                 api_factory=self.api_factory,
                 scope=scope,
@@ -199,7 +191,3 @@ class ComplexInstrumentTests(unittest.TestCase):
                 identifier_mapping=identifier_mapping,
                 instrument_name_enrichment=True,
             )
-
-
-if __name__ == "__main__":
-    unittest.main()

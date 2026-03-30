@@ -1,39 +1,31 @@
-import unittest
-import asyncio
-from finbourne_sdk_utils.extract.group_holdings import get_holdings_for_group
-from pathlib import Path
-from finbourne_sdk_utils.cocoon.utilities import create_scope_id
-from parameterized import parameterized
-
-from finbourne_sdk_utils import logger
-import lusid
-import pandas as pd
-from finbourne_sdk_utils import cocoon as cocoon
+import datetime
 import os
-import sys
-from lusid.models import CurrencyAndAmount
+from pathlib import Path
+from typing import ClassVar
+
+import pandas as pd
+import pytest
+import finbourne.sdk.services.lusid as lusid
+from finbourne.sdk.extensions import SyncApiClientFactory
+
+from finbourne_sdk_utils import cocoon as cocoon
+from finbourne_sdk_utils import logger
+from finbourne_sdk_utils.cocoon.utilities import create_scope_id
+from finbourne_sdk_utils.extract.group_holdings import get_holdings_for_group
 
 # Create the Portfolios, Portfolio Groups and Holdings
-scope = create_scope_id()
+_scope = create_scope_id()
 
 
-class CocoonTestsExtractGroupHoldings(unittest.IsolatedAsyncioTestCase):
-    
- 
+class TestExtractGroupHoldings:
+    api_factory: ClassVar[SyncApiClientFactory]
+    scope: ClassVar[str]
+
     @classmethod
-    async def setup(cls) -> None:
-        
-        secrets_file = Path(__file__).parent.parent.parent.joinpath("secrets.json")
-        
-        
-        loop = asyncio.get_event_loop()
-                
-       # executor = ProcessPoolExecutor(max_workers=worker_count)
-        cls.api_factory = lusid.SyncApiClientFactory( )
-   
+    def setup_class(cls) -> None:
+        cls.api_factory = SyncApiClientFactory()
         cls.logger = logger.LusidLogger(os.getenv("FBN_LOG_LEVEL", "info"))
-
-        cls.scope = scope
+        cls.scope = _scope
 
         portfolio_holdings = pd.read_csv(
             Path(__file__).parent.joinpath("./data/holdings-example.csv")
@@ -109,66 +101,49 @@ class CocoonTestsExtractGroupHoldings(unittest.IsolatedAsyncioTestCase):
         assert len(response["portfolio_groups"]["errors"]) == 0
 
         # Create group with sub-groups
-        response = cls.api_factory.build(
-            lusid.api.PortfolioGroupsApi
+        group_response = cls.api_factory.build(
+            lusid.PortfolioGroupsApi
         ).create_portfolio_group(
             scope=cls.scope,
-            create_portfolio_group_request=lusid.models.CreatePortfolioGroupRequest(
+            create_portfolio_group_request=lusid.CreatePortfolioGroupRequest(
                 code="SubGroups",
                 display_name="SubGroups",
-                created="2010-10-09T08:00:00Z",
-                values=[lusid.models.ResourceId(scope=cls.scope, code="Portfolio-Y")],
-                sub_groups=[lusid.models.ResourceId(scope=cls.scope, code="ABC12")],
+                created=datetime.datetime(2010, 10, 9, 8, 0, 0, tzinfo=datetime.timezone.utc),
+                values=[lusid.ResourceId(scope=cls.scope, code="Portfolio-Y")],
+                sub_groups=[lusid.ResourceId(scope=cls.scope, code="ABC12")],
             ),
         )
 
-        assert isinstance(response, lusid.models.PortfolioGroup)
+        assert isinstance(group_response, lusid.PortfolioGroup)
 
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        
-        
-        loop = asyncio.get_event_loop()
-        
-        
-        loop.run_until_complete( cls.setup() )
-    
-
-    def check_holdings_correct(
-        self, group_holdings, expected_values, lusid_results_keyed
-    ):
-
+    def check_holdings_correct(self, group_holdings, expected_values, lusid_results_keyed):
         # Check that there are the right number of results and they have the correct keys
-        self.assertSetEqual(set(group_holdings.keys()), set(expected_values.keys()))
+        assert set(group_holdings.keys()) == set(expected_values.keys())
 
         if lusid_results_keyed is not None:
-            self.assertSetEqual(
-                set(group_holdings.keys()), set(lusid_results_keyed.keys())
-            )
+            assert set(group_holdings.keys()) == set(lusid_results_keyed.keys())
 
         # Iterate over each result
         for portfolio, holdings in group_holdings.items():
 
             # Key the result by the instrument name
             holdings_by_instrument_name = {
-                holding.properties["Instrument/default/Name"].value.label_value: holding
+                (holding.properties or {})["Instrument/default/Name"].value.label_value: holding
                 for holding in holdings
             }
 
             # Check that the units and cost are correct according to manual test data
             for instrument_name, holding in holdings_by_instrument_name.items():
-                self.assertEqual(
-                    float(holding.cost.amount),
-                    float(expected_values[portfolio][instrument_name]["cost"]),
+                assert holding.cost is not None
+                assert float(holding.cost.amount) == float(
+                    expected_values[portfolio][instrument_name]["cost"]
                 )
-                self.assertEqual(
-                    float(holding.units),
-                    float(expected_values[portfolio][instrument_name]["units"]),
+                assert float(holding.units) == float(
+                    expected_values[portfolio][instrument_name]["units"]
                 )
-                self.assertEqual(
-                    holding.cost.currency,
-                    expected_values[portfolio][instrument_name]["cost.currency"],
+                assert (
+                    holding.cost.currency
+                    == expected_values[portfolio][instrument_name]["cost.currency"]
                 )
 
                 # If this is not grouped by Portfolio, skip checking against LUSID as the merging would have to be
@@ -177,41 +152,28 @@ class CocoonTestsExtractGroupHoldings(unittest.IsolatedAsyncioTestCase):
                     return
 
                 # Check that the units and cost are correct according to LUSID results
-                self.assertEqual(
-                    float(holding.cost.amount),
-                    float(lusid_results_keyed[portfolio][instrument_name].cost.amount),
+                lusid_holding = lusid_results_keyed[portfolio][instrument_name]
+                assert lusid_holding.cost is not None
+                assert lusid_holding.cost_portfolio_ccy is not None
+                assert float(holding.cost.amount) == float(lusid_holding.cost.amount)
+                assert float(holding.units) == float(lusid_holding.units)
+                assert holding.cost.currency == lusid_holding.cost.currency
+                assert (
+                    holding.cost_portfolio_ccy.currency
+                    == lusid_holding.cost_portfolio_ccy.currency
                 )
-                self.assertEqual(
-                    float(holding.units),
-                    float(lusid_results_keyed[portfolio][instrument_name].units),
-                )
-                self.assertEqual(
-                    holding.cost.currency,
-                    lusid_results_keyed[portfolio][instrument_name].cost.currency,
-                )
-                self.assertEqual(
-                    holding.cost_portfolio_ccy.currency,
-                    lusid_results_keyed[portfolio][
-                        instrument_name
-                    ].cost_portfolio_ccy.currency,
-                )
-                self.assertEqual(
-                    float(holding.cost_portfolio_ccy.amount),
-                    float(
-                        lusid_results_keyed[portfolio][
-                            instrument_name
-                        ].cost_portfolio_ccy.amount
-                    ),
+                assert float(holding.cost_portfolio_ccy.amount) == float(
+                    lusid_holding.cost_portfolio_ccy.amount
                 )
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "group_code, group_by_portfolio, expected_results",
         [
-            [
-                "Grouped by portfolio, no sub-groups",
+            (
                 "ABC12",
                 True,
                 {
-                    f"{scope} : Portfolio-X": {
+                    f"{_scope} : Portfolio-X": {
                         "Amazon": {
                             "cost": "52916721",
                             "cost.currency": "USD",
@@ -228,7 +190,7 @@ class CocoonTestsExtractGroupHoldings(unittest.IsolatedAsyncioTestCase):
                             "units": "95421",
                         },
                     },
-                    f"{scope} : Portfolio-Z": {
+                    f"{_scope} : Portfolio-Z": {
                         "Lloyds Banking Group PLC": {
                             "cost": "141900",
                             "cost.currency": "GBP",
@@ -246,13 +208,12 @@ class CocoonTestsExtractGroupHoldings(unittest.IsolatedAsyncioTestCase):
                         },
                     },
                 },
-            ],
-            [
-                "Grouped by portfolio, single sub-group",
+            ),
+            (
                 "SubGroups",
                 True,
                 {
-                    f"{scope} : Portfolio-X": {
+                    f"{_scope} : Portfolio-X": {
                         "Amazon": {
                             "cost": "52916721",
                             "cost.currency": "USD",
@@ -269,7 +230,7 @@ class CocoonTestsExtractGroupHoldings(unittest.IsolatedAsyncioTestCase):
                             "units": "95421",
                         },
                     },
-                    f"{scope} : Portfolio-Z": {
+                    f"{_scope} : Portfolio-Z": {
                         "Lloyds Banking Group PLC": {
                             "cost": "141900",
                             "cost.currency": "GBP",
@@ -286,7 +247,7 @@ class CocoonTestsExtractGroupHoldings(unittest.IsolatedAsyncioTestCase):
                             "units": "95421",
                         },
                     },
-                    f"{scope} : Portfolio-Y": {
+                    f"{_scope} : Portfolio-Y": {
                         "Apple Inc": {
                             "cost": "2084000",
                             "cost.currency": "USD",
@@ -299,13 +260,12 @@ class CocoonTestsExtractGroupHoldings(unittest.IsolatedAsyncioTestCase):
                         },
                     },
                 },
-            ],
-            [
-                "Merged together, no sub-groups",
+            ),
+            (
                 "ABC12",
                 False,
                 {
-                    f"{scope} : ABC12": {
+                    f"{_scope} : ABC12": {
                         "Amazon": {
                             "cost": "52916721",
                             "cost.currency": "USD",
@@ -333,13 +293,12 @@ class CocoonTestsExtractGroupHoldings(unittest.IsolatedAsyncioTestCase):
                         },
                     }
                 },
-            ],
-            [
-                "Merged together, single sub-group",
+            ),
+            (
                 "SubGroups",
                 False,
                 {
-                    f"{scope} : SubGroups": {
+                    f"{_scope} : SubGroups": {
                         "Amazon": {
                             "cost": "105833442",
                             "cost.currency": "USD",
@@ -367,17 +326,23 @@ class CocoonTestsExtractGroupHoldings(unittest.IsolatedAsyncioTestCase):
                         },
                     }
                 },
-            ],
-        ]
+            ),
+        ],
+        ids=[
+            "Grouped by portfolio, no sub-groups",
+            "Grouped by portfolio, single sub-group",
+            "Merged together, no sub-groups",
+            "Merged together, single sub-group",
+        ],
     )
     def test_get_holdings_for_group_grouped_by_portfolio(
-        self, _, group_code, group_by_portfolio, expected_results
+        self, group_code, group_by_portfolio, expected_results
     ) -> None:
 
         # Get the group holdings
         group_holdings = get_holdings_for_group(
             api_factory=self.api_factory,
-            group_scope=scope,
+            group_scope=_scope,
             group_code=group_code,
             property_keys=["Instrument/default/Name"],
             group_by_portfolio=group_by_portfolio,
@@ -391,25 +356,30 @@ class CocoonTestsExtractGroupHoldings(unittest.IsolatedAsyncioTestCase):
 
         # Otherwise get the result from LUSID
         lusid_results = self.api_factory.build(
-            lusid.api.PortfolioGroupsApi
+            lusid.PortfolioGroupsApi
         ).get_holdings_for_portfolio_group(
             scope=self.scope, code=group_code, property_keys=["Instrument/default/Name"]
         )
 
         # Key the LUSID result against portfolio and then instrument name
-        lusid_results_keyed = {}
+        lusid_results_keyed: dict = {}
         for holding in lusid_results.values:
-            portfolio_scope = holding.properties[
+            portfolio_scope = (holding.properties or {}).get(
                 "Holding/default/SourcePortfolioScope"
-            ].value.label_value
-            portfolio_code = holding.properties[
+            )
+            portfolio_code = (holding.properties or {}).get(
                 "Holding/default/SourcePortfolioId"
-            ].value.label_value
-            portfolio = f"{portfolio_scope} : {portfolio_code}"
+            )
+            if portfolio_scope is None or portfolio_code is None:
+                continue
+            if portfolio_scope.value is None or portfolio_code.value is None:
+                continue
+            portfolio = f"{portfolio_scope.value.label_value} : {portfolio_code.value.label_value}"
 
-            instrument_name = holding.properties[
-                "Instrument/default/Name"
-            ].value.label_value
+            instrument_prop = (holding.properties or {}).get("Instrument/default/Name")
+            if instrument_prop is None or instrument_prop.value is None:
+                continue
+            instrument_name = instrument_prop.value.label_value
             lusid_results_keyed.setdefault(portfolio, {}).setdefault(
                 instrument_name, holding
             )

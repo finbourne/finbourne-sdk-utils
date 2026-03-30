@@ -1,27 +1,33 @@
-import unittest
 from pathlib import Path
+from typing import ClassVar
 import pandas as pd
 import json
-import lusid
-import lusid.models as models
+import finbourne.sdk.services.lusid as lusid
+import finbourne.sdk.services.lusid.models as models
+from finbourne.sdk.extensions import SyncApiClientFactory
+from finbourne.sdk.exceptions import ApiException
 
 from finbourne_sdk_utils import cocoon as cocoon
 from finbourne_sdk_utils.cocoon.utilities import create_scope_id
-import datetime
 from dateutil.tz import tzutc
 import logging
+from datetime import datetime
 
 logger = logging.getLogger()
 
 
-class CocoonTestPortfolioGroup(unittest.TestCase):
+class TestCocoonPortfolioGroup:
+    portfolio_scope: ClassVar[str]
+    api_factory: ClassVar[SyncApiClientFactory]
+    unique_portfolios: ClassVar[list[str]]
+
     @classmethod
-    def setUpClass(cls) -> None:
+    def setup_class(cls) -> None:
 
         cls.portfolio_scope = create_scope_id()
-        
-        cls.api_factory = lusid.SyncApiClientFactory()
-        
+
+        cls.api_factory = SyncApiClientFactory()
+
         cls.unique_portfolios = pd.read_csv(
             Path(__file__).parent.joinpath(
                 "data/port_group_tests/test_1_pg_create_with_portfolios.csv"
@@ -30,39 +36,38 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
 
         def create_portfolio_model(code):
             model = models.CreateTransactionPortfolioRequest(
-                display_name=code,
+                displayName=code,
                 code=code,
-                base_currency="GBP",
+                baseCurrency="GBP",
                 description="Paper transaction portfolio",
-                created="2020-02-25T00:00:00Z",
+                created=datetime(2020, 2, 25, 0, 0, 0, tzinfo=tzutc()),
             )
             return model
 
-        try:
-
-            for code in cls.unique_portfolios:
+        for code in cls.unique_portfolios:
+            try:
                 cls.api_factory.build(
-                    lusid.api.TransactionPortfoliosApi
+                    lusid.TransactionPortfoliosApi
                 ).create_portfolio(
                     scope=cls.portfolio_scope,
                     create_transaction_portfolio_request=create_portfolio_model(code),
                 )
-        except lusid.exceptions.ApiException as e:
-            if e.status == 404:
-                logger.error(f"The portfolio {code} already exists")
+            except ApiException as e:
+                if e.status == 404:
+                    logger.error(f"The portfolio {code} already exists")
 
-    def log_error_requests_title(cls, domain, responses):
+    def log_error_requests_title(self, domain, responses):
         if len(responses.get(domain, {}).get("errors", [])) > 0:
             for error in responses[domain]["errors"]:
                 return logger.error(json.loads(error.body)["title"])
 
-    def csv_to_data_frame_with_scope(cls, csv, scope):
+    def csv_to_data_frame_with_scope(self, csv, scope):
         data_frame = pd.read_csv(Path(__file__).parent.joinpath(csv))
         data_frame["Scope"] = scope
         return data_frame
 
     def cocoon_load_from_dataframe(
-        cls,
+        self,
         scope,
         data_frame,
         mapping_optional={"values.scope": "Scope", "values.code": "FundCode",},
@@ -71,7 +76,7 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
     ):
 
         return cocoon.cocoon.load_from_data_frame(
-            api_factory=cls.api_factory,
+            api_factory=self.api_factory,
             scope=scope,
             data_frame=data_frame,
             mapping_required={
@@ -109,7 +114,7 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
         #self.log_error_requests_title("portfolio_groups", responses)
 
         # Test that there is a successful request per line in the dataframe
-        self.assertEqual(
+        assert (
             len(
                 [
                     port_group
@@ -119,45 +124,37 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
                     ]
                     for port_group in nested_group
                 ]
-            ),
-            len(data_frame),
+            )
+            == len(data_frame)
         )
 
         # Test that all the portfolios in the dataframe are in the request
-        self.assertEqual(
-            first=sorted(
-                [
-                    code.to_dict()
-                    for code in responses["portfolio_groups"]["success"][0].portfolios
-                ],
-                key=lambda item: item.get("code"),
-            ),
-            second=sorted(
-                [
-                    lusid.models.ResourceId(
-                        code=data_frame["FundCode"][1], scope=data_frame["Scope"][1]
-                    ).to_dict(),
-                    lusid.models.ResourceId(
-                        code=data_frame["FundCode"][0], scope=data_frame["Scope"][0]
-                    ).to_dict(),
-                ],
-                key=lambda item: item.get("code"),
-            ),
+        assert sorted(
+            [
+                code.to_dict()
+                for code in responses["portfolio_groups"]["success"][0].portfolios
+            ],
+            key=lambda item: item.get("code") or "",
+        ) == sorted(
+            [
+                lusid.ResourceId(
+                    code=str(data_frame["FundCode"][1]), scope=str(data_frame["Scope"][1])
+                ).to_dict(),
+                lusid.ResourceId(
+                    code=str(data_frame["FundCode"][0]), scope=str(data_frame["Scope"][0])
+                ).to_dict(),
+            ],
+            key=lambda item: item.get("code") or "",
         )
 
-        self.assertEqual(
-            first=responses["portfolio_groups"]["success"][1].portfolios,
-            second=[
-                lusid.models.ResourceId(
-                    code=data_frame["FundCode"][2], scope=data_frame["Scope"][2]
-                )
-            ],
-        )
+        assert responses["portfolio_groups"]["success"][1].portfolios == [
+            lusid.ResourceId(
+                code=str(data_frame["FundCode"][2]), scope=str(data_frame["Scope"][2])
+            )
+        ]
 
         # Assert that by no unmatched_identifiers are returned in the response for portfolio_groups
-        self.assertFalse(
-            responses["portfolio_groups"].get("unmatched_identifiers", False)
-        )
+        assert not responses["portfolio_groups"].get("unmatched_identifiers", False)
 
     def test_02_pg_create_with_no_portfolio(self) -> None:
 
@@ -185,29 +182,23 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
         self.log_error_requests_title("portfolio_groups", responses)
 
         # Check that the portfolio group is created
-
-        self.assertEqual(
-            first=len(
+        assert (
+            len(
                 [
                     port_group.id
                     for port_group in responses["portfolio_groups"]["success"]
                 ]
-            ),
-            second=len(data_frame),
+            )
+            == len(data_frame)
         )
 
         # Check that the correct portfolio group code is used
-        self.assertEqual(
-            first=responses["portfolio_groups"]["success"][0].id,
-            second=lusid.models.ResourceId(
-                scope=test_case_scope, code=data_frame["PortGroupCode"].tolist()[0]
-            ),
+        assert responses["portfolio_groups"]["success"][0].id == lusid.ResourceId(
+            scope=test_case_scope, code=data_frame["PortGroupCode"].tolist()[0]
         )
 
         # Check that the portfolio group request has now portfolios
-        self.assertTrue(
-            len(responses["portfolio_groups"]["success"][0].portfolios) == 0
-        )
+        assert len(responses["portfolio_groups"]["success"][0].portfolios) == 0
 
     def test_03_pg_create_multiple_groups_no_portfolio(self) -> None:
 
@@ -234,24 +225,19 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
         self.log_error_requests_title("portfolio_groups", responses)
 
         # Check that there is a requet per portfolio group
-
-        self.assertEqual(
-            first=len(
+        assert (
+            len(
                 [
                     port_group.id
                     for port_group in responses["portfolio_groups"]["success"]
                 ]
-            ),
-            second=len(data_frame),
+            )
+            == len(data_frame)
         )
 
         # Check that the portfolio group code matches the code in the dataframe
-
-        self.assertEqual(
-            first=responses["portfolio_groups"]["success"][1].id,
-            second=lusid.models.ResourceId(
-                scope=test_case_scope, code=data_frame["PortGroupCode"].tolist()[1]
-            ),
+        assert responses["portfolio_groups"]["success"][1].id == lusid.ResourceId(
+            scope=test_case_scope, code=data_frame["PortGroupCode"].tolist()[1]
         )
 
     def test_04_pg_create_with_portfolio_not_exist(self):
@@ -279,15 +265,13 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
         self.log_error_requests_title("portfolio_groups", responses)
 
         # Check that LUSID cannot find the portfolio
-
-        self.assertEqual(
-            json.loads(responses["portfolio_groups"]["errors"][0].body)["name"],
-            "PortfolioNotFound",
+        assert (
+            json.loads(responses["portfolio_groups"]["errors"][0].body)["name"]
+            == "PortfolioNotFound"
         )
 
         # Check there are no successful requests
-
-        self.assertEqual(len(responses["portfolio_groups"]["success"]), 0)
+        assert len(responses["portfolio_groups"]["success"]) == 0
 
     def test_05_pg_create_with_duplicate_portfolios(self):
 
@@ -316,8 +300,7 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
         data_frame.drop_duplicates(inplace=True)
 
         # Check that there is a request for each unique portfolio
-
-        self.assertEqual(
+        assert (
             len(
                 [
                     port_group
@@ -327,31 +310,27 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
                     ]
                     for port_group in nested_group
                 ]
-            ),
-            len(data_frame),
+            )
+            == len(data_frame)
         )
 
         # Check that a request is generated with unqiue portfolio only
-
-        self.assertEqual(
-            first=sorted(
-                [
-                    code.to_dict()
-                    for code in responses["portfolio_groups"]["success"][0].portfolios
-                ],
-                key=lambda item: item.get("code"),
-            ),
-            second=sorted(
-                [
-                    lusid.models.ResourceId(
-                        code=data_frame["FundCode"][0], scope=data_frame["Scope"][0]
-                    ).to_dict(),
-                    lusid.models.ResourceId(
-                        code=data_frame["FundCode"][1], scope=data_frame["Scope"][1]
-                    ).to_dict(),
-                ],
-                key=lambda item: item.get("code"),
-            ),
+        assert sorted(
+            [
+                code.to_dict()
+                for code in responses["portfolio_groups"]["success"][0].portfolios
+            ],
+            key=lambda item: item.get("code") or "",
+        ) == sorted(
+            [
+                lusid.ResourceId(
+                    code=str(data_frame["FundCode"][0]), scope=str(data_frame["Scope"][0])
+                ).to_dict(),
+                lusid.ResourceId(
+                    code=str(data_frame["FundCode"][1]), scope=str(data_frame["Scope"][1])
+                ).to_dict(),
+            ],
+            key=lambda item: item.get("code") or "",
         )
 
     def test_06_pg_create_duplicate_port_group(self):
@@ -380,16 +359,11 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
         self.log_error_requests_title("portfolio_groups", responses)
 
         # Check for one successful request
-
-        self.assertEqual(len(responses["portfolio_groups"]["success"]), 1)
+        assert len(responses["portfolio_groups"]["success"]) == 1
 
         # Check the successful request has same code as dataframe portfolio group
-
-        self.assertEqual(
-            first=responses["portfolio_groups"]["success"][0].id,
-            second=lusid.models.ResourceId(
-                scope=test_case_scope, code=data_frame["PortGroupCode"].tolist()[0]
-            ),
+        assert responses["portfolio_groups"]["success"][0].id == lusid.ResourceId(
+            scope=test_case_scope, code=data_frame["PortGroupCode"].tolist()[0]
         )
 
     def test_07_pg_create_with_properties(self) -> None:
@@ -420,32 +394,29 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
         self.log_error_requests_title("portfolio_groups", responses)
 
         response_with_properties = self.api_factory.build(
-            lusid.api.PortfolioGroupsApi
+            lusid.PortfolioGroupsApi
         ).get_group_properties(
             scope=test_case_scope, code=data_frame["PortGroupCode"].tolist()[0],
         )
 
-        self.assertEqual(
-            {
-                "PortfolioGroup/"
-                + test_case_scope
-                + "/location": lusid.models.ModelProperty(
-                    key="PortfolioGroup/" + test_case_scope + "/location",
-                    value=lusid.models.PropertyValue(label_value="UK"),
-                    effective_from=datetime.datetime.min.replace(tzinfo=tzutc()),
-                    effective_until=datetime.datetime.max.replace(tzinfo=tzutc()),
-                ),
-                "PortfolioGroup/"
-                + test_case_scope
-                + "/MifidFlag": lusid.models.ModelProperty(
-                    key="PortfolioGroup/" + test_case_scope + "/MifidFlag",
-                    value=lusid.models.PropertyValue(label_value="Y"),
-                    effective_from=datetime.datetime.min.replace(tzinfo=tzutc()),
-                    effective_until=datetime.datetime.max.replace(tzinfo=tzutc()),
-                ),
-            },
-            response_with_properties.properties,
-        )
+        assert response_with_properties.properties == {
+            "PortfolioGroup/"
+            + test_case_scope
+            + "/location": lusid.ModelProperty(
+                key="PortfolioGroup/" + test_case_scope + "/location",
+                value=lusid.PropertyValue(label_value="UK"),
+                effective_from=datetime.min.replace(tzinfo=tzutc()),
+                effective_until=datetime.max.replace(tzinfo=tzutc()),
+            ),
+            "PortfolioGroup/"
+            + test_case_scope
+            + "/MifidFlag": lusid.ModelProperty(
+                key="PortfolioGroup/" + test_case_scope + "/MifidFlag",
+                value=lusid.PropertyValue(label_value="Y"),
+                effective_from=datetime.min.replace(tzinfo=tzutc()),
+                effective_until=datetime.max.replace(tzinfo=tzutc()),
+            ),
+        }
 
     def test_08_pg_add_bad_portfolio(self):
 
@@ -466,12 +437,12 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
         )
 
         # Create the portfolio group as a seperate request
-        port_group_request = lusid.models.CreatePortfolioGroupRequest(
+        port_group_request = lusid.CreatePortfolioGroupRequest(
             code=data_frame["PortGroupCode"][0],
             display_name=data_frame["PortGroupCode"][0],
         )
 
-        self.api_factory.build(lusid.api.PortfolioGroupsApi).create_portfolio_group(
+        self.api_factory.build(lusid.PortfolioGroupsApi).create_portfolio_group(
             scope=test_case_scope, create_portfolio_group_request=port_group_request
         )
 
@@ -481,13 +452,10 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
 
         self.log_error_requests_title("portfolio_groups", responses)
 
-        self.assertTrue(len(responses["portfolio_groups"]["errors"]) == 0)
+        assert len(responses["portfolio_groups"]["errors"]) == 0
 
-        self.assertEqual(
-            first=responses["portfolio_groups"]["success"][0].id,
-            second=lusid.models.ResourceId(
-                scope=test_case_scope, code=data_frame["PortGroupCode"].tolist()[0]
-            ),
+        assert responses["portfolio_groups"]["success"][0].id == lusid.ResourceId(
+            scope=test_case_scope, code=data_frame["PortGroupCode"].tolist()[0]
         )
 
     def test_09_pg_add_duplicate_portfolio(self) -> None:
@@ -509,12 +477,12 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
         )
 
         # Create the portfolio group as a seperate request
-        port_group_request = lusid.models.CreatePortfolioGroupRequest(
+        port_group_request = lusid.CreatePortfolioGroupRequest(
             code=data_frame["PortGroupCode"][0],
             display_name=data_frame["PortGroupCode"][0],
         )
 
-        self.api_factory.build(lusid.api.PortfolioGroupsApi).create_portfolio_group(
+        self.api_factory.build(lusid.PortfolioGroupsApi).create_portfolio_group(
             scope=test_case_scope, create_portfolio_group_request=port_group_request
         )
 
@@ -524,11 +492,8 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
 
         self.log_error_requests_title("portfolio_groups", responses)
 
-        self.assertEqual(
-            first=responses["portfolio_groups"]["success"][0].portfolios[0],
-            second=lusid.models.ResourceId(
-                code=data_frame["FundCode"][0], scope=data_frame["Scope"][0]
-            ),
+        assert responses["portfolio_groups"]["success"][0].portfolios[0] == lusid.ResourceId(
+            code=str(data_frame["FundCode"][0]), scope=str(data_frame["Scope"][0])
         )
 
     def test_10_pg_add_no_new_portfolio(self) -> None:
@@ -549,17 +514,17 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
             self.portfolio_scope,
         )
 
-        port_group_request = lusid.models.CreatePortfolioGroupRequest(
+        port_group_request = lusid.CreatePortfolioGroupRequest(
             code=data_frame["PortGroupCode"][0],
             display_name=data_frame["PortGroupCode"][0],
             values=[
-                lusid.models.ResourceId(
-                    code=data_frame["FundCode"][0], scope=self.portfolio_scope
+                lusid.ResourceId(
+                    code=str(data_frame["FundCode"][0]), scope=self.portfolio_scope
                 )
             ],
         )
 
-        self.api_factory.build(lusid.api.PortfolioGroupsApi).create_portfolio_group(
+        self.api_factory.build(lusid.PortfolioGroupsApi).create_portfolio_group(
             scope=test_case_scope, create_portfolio_group_request=port_group_request,
         )
 
@@ -569,11 +534,8 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
 
         self.log_error_requests_title("portfolio_groups", responses)
 
-        self.assertEqual(
-            first=responses["portfolio_groups"]["success"][0].portfolios[0],
-            second=lusid.models.ResourceId(
-                code=data_frame["FundCode"][0], scope=data_frame["Scope"][0]
-            ),
+        assert responses["portfolio_groups"]["success"][0].portfolios[0] == lusid.ResourceId(
+            code=str(data_frame["FundCode"][0]), scope=str(data_frame["Scope"][0])
         )
 
     def test_11_pg_add_bad_and_good_portfolios(self):
@@ -596,12 +558,12 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
         )
 
         # Create the portfolio group as a seperate request
-        port_group_request = lusid.models.CreatePortfolioGroupRequest(
+        port_group_request = lusid.CreatePortfolioGroupRequest(
             code=data_frame["PortGroupCode"][0],
             display_name=data_frame["PortGroupCode"][0],
         )
 
-        self.api_factory.build(lusid.api.PortfolioGroupsApi).create_portfolio_group(
+        self.api_factory.build(lusid.PortfolioGroupsApi).create_portfolio_group(
             scope=test_case_scope, create_portfolio_group_request=port_group_request
         )
 
@@ -613,27 +575,24 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
 
         remove_dupe_df = data_frame[~data_frame["FundCode"].str.contains("BAD_PORT")]
 
-        self.assertEqual(
-            first=sorted(
-                [
-                    code.to_dict()
-                    for code in responses["portfolio_groups"]["success"][0].portfolios
-                ],
-                key=lambda item: item.get("code"),
-            ),
-            second=sorted(
-                [
-                    lusid.models.ResourceId(
-                        code=remove_dupe_df["FundCode"].tolist()[0],
-                        scope=self.portfolio_scope,
-                    ).to_dict(),
-                    lusid.models.ResourceId(
-                        code=remove_dupe_df["FundCode"].tolist()[1],
-                        scope=self.portfolio_scope,
-                    ).to_dict(),
-                ],
-                key=lambda item: item.get("code"),
-            ),
+        assert sorted(
+            [
+                code.to_dict()
+                for code in responses["portfolio_groups"]["success"][0].portfolios
+            ],
+            key=lambda item: item.get("code") or "",
+        ) == sorted(
+            [
+                lusid.ResourceId(
+                    code=remove_dupe_df["FundCode"].tolist()[0],
+                    scope=self.portfolio_scope,
+                ).to_dict(),
+                lusid.ResourceId(
+                    code=remove_dupe_df["FundCode"].tolist()[1],
+                    scope=self.portfolio_scope,
+                ).to_dict(),
+            ],
+            key=lambda item: item.get("code") or "",
         )
 
     def test_12_pg_add_portfolios_different_scopes(self) -> None:
@@ -656,7 +615,7 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
         )
 
         port_scope_for_test = create_scope_id()
-        self.api_factory.build(lusid.api.TransactionPortfoliosApi).create_portfolio(
+        self.api_factory.build(lusid.TransactionPortfoliosApi).create_portfolio(
             scope=port_scope_for_test,
             create_transaction_portfolio_request=models.CreateTransactionPortfolioRequest(
                 display_name=data_frame["FundCode"][0],
@@ -665,17 +624,17 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
             ),
         )
 
-        port_group_request = lusid.models.CreatePortfolioGroupRequest(
+        port_group_request = lusid.CreatePortfolioGroupRequest(
             code=data_frame["PortGroupCode"][0],
             display_name=data_frame["PortGroupCode"][0],
             values=[
-                lusid.models.ResourceId(
-                    code=data_frame["FundCode"][0], scope=port_scope_for_test
+                lusid.ResourceId(
+                    code=str(data_frame["FundCode"][0]), scope=port_scope_for_test
                 )
             ],
         )
 
-        self.api_factory.build(lusid.api.PortfolioGroupsApi).create_portfolio_group(
+        self.api_factory.build(lusid.PortfolioGroupsApi).create_portfolio_group(
             scope=test_case_scope, create_portfolio_group_request=port_group_request,
         )
 
@@ -685,24 +644,22 @@ class CocoonTestPortfolioGroup(unittest.TestCase):
 
         self.log_error_requests_title("portfolio_groups", responses)
 
-        self.assertTrue(
-            expr=all(
-                [
-                    id in responses["portfolio_groups"]["success"][0].portfolios
-                    for id in [
-                        lusid.models.ResourceId(
-                            code=data_frame["FundCode"][1], scope=data_frame["Scope"][1]
-                        ),
-                        lusid.models.ResourceId(
-                            code=data_frame["FundCode"][0], scope=port_scope_for_test
-                        ),
-                        lusid.models.ResourceId(
-                            code=data_frame["FundCode"][0], scope=data_frame["Scope"][0]
-                        ),
-                        lusid.models.ResourceId(
-                            code=data_frame["FundCode"][2], scope=data_frame["Scope"][2]
-                        ),
-                    ]
+        assert all(
+            [
+                id in responses["portfolio_groups"]["success"][0].portfolios
+                for id in [
+                    lusid.ResourceId(
+                        code=str(data_frame["FundCode"][1]), scope=str(data_frame["Scope"][1])
+                    ),
+                    lusid.ResourceId(
+                        code=str(data_frame["FundCode"][0]), scope=port_scope_for_test
+                    ),
+                    lusid.ResourceId(
+                        code=str(data_frame["FundCode"][0]), scope=str(data_frame["Scope"][0])
+                    ),
+                    lusid.ResourceId(
+                        code=str(data_frame["FundCode"][2]), scope=str(data_frame["Scope"][2])
+                    ),
                 ]
-            )
+            ]
         )

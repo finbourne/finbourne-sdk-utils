@@ -1,8 +1,7 @@
 import os
-import unittest
-from pathlib import Path
-import lusid
-import lusid.models as models
+import logging
+import finbourne.sdk.services.lusid.models as models
+from finbourne.sdk.extensions import SyncApiClientFactory
 
 from finbourne_sdk_utils import logger
 from finbourne_sdk_utils.cocoon.utilities import create_scope_id
@@ -11,14 +10,14 @@ from finbourne_sdk_utils.cocoon.transaction_type_upload import (
 )
 
 
-class CocoonTestTransactionTypeUpload(unittest.TestCase):
+class TestCocoonTransactionTypeUpload:
 
     @classmethod
-    def setUpClass(cls) -> None:
+    def setup_class(cls) -> None:
         cls.logger = logger.LusidLogger(os.getenv("FBN_LOG_LEVEL", "info"))
-        
-        cls.api_factory = lusid.SyncApiClientFactory() 
-        
+
+        cls.api_factory = SyncApiClientFactory()
+
         cls.alias = models.TransactionConfigurationTypeAlias(
             type=create_scope_id().replace("-", ""),
             description="TESTBUY1",
@@ -70,40 +69,35 @@ class CocoonTestTransactionTypeUpload(unittest.TestCase):
             == (alias.type, alias.transaction_group)
         ][0]
 
-        self.assertEqual(
-            set(new_alias.to_dict().items()), set(self.alias.to_dict().items()),
+        assert set(new_alias.to_dict().items()) == set(self.alias.to_dict().items())
+
+        assert sorted(
+            [
+                mvmts.to_dict()
+                for txn_configs in self.response.transaction_configs
+                for mvmts in txn_configs.movements
+                if any(x.type == new_alias.type for x in txn_configs.aliases)
+            ],
+            key=lambda item: item.get("movement_types") or "",
+        ) == sorted(
+            [item.to_dict() for item in self.movements],
+            key=lambda item: item.get("movement_types") or "",
         )
 
-        self.assertEqual(
-            sorted(
-                [
-                    mvmts.to_dict()
-                    for txn_configs in self.response.transaction_configs
-                    for mvmts in txn_configs.movements
-                    if any(x.type == new_alias.type for x in txn_configs.aliases)
-                ],
-                key=lambda item: item.get("movement_types") or "",
-            ),
-            sorted(
-                [item.to_dict() for item in self.movements],
-                key=lambda item: item.get("movement_types") or "",
-            ),
-        )
-
-    def test_create_duplication_txn_type_throws_error(self):
+    def test_create_duplication_txn_type_throws_error(self, caplog):
 
         """
         Attempt to create a transaction type which already exists.
         Verify that function returns the correct log message.
         """
 
-        with self.assertLogs() as context_manager:
+        with caplog.at_level(logging.WARNING):
 
             create_transaction_type_configuration(
                 self.api_factory, self.alias, self.movements
             )
 
-            self.assertEqual(
-                f"WARNING:root:The following alias already exists: Type of {self.alias.type} with source {self.alias.transaction_group}",
-                context_manager.output[1],
+            assert (
+                f"The following alias already exists: Type of {self.alias.type} with source {self.alias.transaction_group}"
+                in caplog.text
             )

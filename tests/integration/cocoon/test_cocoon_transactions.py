@@ -1,17 +1,18 @@
 import datetime
 import os
-import unittest
 import uuid
 from pathlib import Path
+from typing import ClassVar
 import pandas as pd
 
+import pytest
 
 from finbourne_sdk_utils import cocoon as cocoon
-from parameterized import parameterized
-import lusid
+import finbourne.sdk.services.lusid as lusid
+from finbourne.sdk.extensions import SyncApiClientFactory
+from finbourne.sdk.exceptions import ApiException
 from finbourne_sdk_utils import logger
 from finbourne_sdk_utils.cocoon.utilities import create_scope_id
-from finbourne_sdk_utils.cocoon import load_from_data_frame
 
 client_internal = "Instrument/default/ClientInternal"
 sedol = "Instrument/default/Sedol"
@@ -59,18 +60,18 @@ def dict_for_comparison(list_of_transactions):
     }
 
 
-class CocoonTestsTransactions(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
+class TestCocoonTransactions:
+    api_factory: ClassVar[SyncApiClientFactory]
 
-        cls.api_factory = lusid.SyncApiClientFactory( )
-        
+    @classmethod
+    def setup_class(cls) -> None:
+        cls.api_factory = SyncApiClientFactory()
         cls.logger = logger.LusidLogger(os.getenv("FBN_LOG_LEVEL", "info"))
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "scope, file_name, mapping_required, mapping_optional, identifier_mapping, property_columns, properties_scope, batch_size, expected_outcome",
         [
-            [
-                "Test standard transaction load",
+            (
                 "prime_broker_test",
                 "data/global-fund-combined-transactions.csv",
                 {
@@ -95,10 +96,9 @@ class CocoonTestsTransactions(unittest.TestCase):
                 ["exposure_counterparty", "compls", "val", "location_region"],
                 "operations001",
                 None,
-                lusid.models.Version,
-            ],
-            [
-                "Add in some constants",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/global-fund-combined-transactions.csv",
                 {
@@ -123,10 +123,9 @@ class CocoonTestsTransactions(unittest.TestCase):
                 ["exposure_counterparty", "compls", "val", "location_region"],
                 "operations001",
                 None,
-                lusid.models.Version,
-            ],
-            [
-                "Pass in None for some of properties_scope which accepts this",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/global-fund-combined-transactions.csv",
                 {
@@ -151,10 +150,9 @@ class CocoonTestsTransactions(unittest.TestCase):
                 ["exposure_counterparty", "compls", "val", "location_region"],
                 None,
                 None,
-                lusid.models.Version,
-            ],
-            [
-                "Pass a constant for the portfolio code",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/global-fund-combined-transactions.csv",
                 {
@@ -179,10 +177,9 @@ class CocoonTestsTransactions(unittest.TestCase):
                 ["exposure_counterparty", "compls", "val", "location_region"],
                 None,
                 None,
-                lusid.models.Version,
-            ],
-            [
-                "Try with a small batch",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/global-fund-combined-transactions.csv",
                 {
@@ -207,10 +204,9 @@ class CocoonTestsTransactions(unittest.TestCase):
                 ["exposure_counterparty", "compls", "val", "location_region"],
                 None,
                 2,
-                lusid.models.Version,
-            ],
-            [
-                "Try with a small batch & random scope to ensure property cretaion",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/global-fund-combined-transactions.csv",
                 {
@@ -235,10 +231,9 @@ class CocoonTestsTransactions(unittest.TestCase):
                 ["exposure_counterparty", "compls", "val", "location_region"],
                 f"prime_broker_test_{create_scope_id()}",
                 2,
-                lusid.models.Version,
-            ],
-            [
-                "Test standard transaction load with nulls for optional parameters",
+                lusid.Version,
+            ),
+            (
                 "prime_broker_test",
                 "data/global-fund-combined-transactions-with-nulls.csv",
                 {
@@ -263,37 +258,31 @@ class CocoonTestsTransactions(unittest.TestCase):
                 ["exposure_counterparty", "compls", "val", "location_region"],
                 "operations001",
                 None,
-                lusid.models.Version,
-            ],
-        ]
+                lusid.Version,
+            ),
+        ],
+        ids=[
+            "Test standard transaction load",
+            "Add in some constants",
+            "Pass in None for some of properties_scope which accepts this",
+            "Pass a constant for the portfolio code",
+            "Try with a small batch",
+            "Try with a small batch & random scope to ensure property creation",
+            "Test standard transaction load with nulls for optional parameters",
+        ],
     )
     def test_load_from_data_frame_transactions_success(
-            self,
-            _,
-            scope,
-            file_name,
-            mapping_required,
-            mapping_optional,
-            identifier_mapping,
-            property_columns,
-            properties_scope,
-            batch_size,
-            expected_outcome,
+        self,
+        scope,
+        file_name,
+        mapping_required,
+        mapping_optional,
+        identifier_mapping,
+        property_columns,
+        properties_scope,
+        batch_size,
+        expected_outcome,
     ) -> None:
-        """
-        Test that transactions
-
-        :param str scope: The scope of the portfolios to load the transactions into
-        :param str file_name: The name of the test data file
-        :param dict{str, str} mapping_required: The dictionary mapping the dataframe fields to LUSID's required base transaction/holding schema
-        :param dict{str, str} mapping_optional: The dictionary mapping the dataframe fields to LUSID's optional base transaction/holding schema
-        :param dict{str, str} identifier_mapping: The dictionary mapping of LUSID instrument identifiers to identifiers in the dataframe
-        :param list[str] property_columns: The columns to create properties for
-        :param str properties_scope: The scope to add the properties to
-        :param any expected_outcome: The expected outcome
-
-        :return: None
-        """
         data_frame = pd.read_csv(Path(__file__).parent.joinpath(file_name))
 
         responses = cocoon.cocoon.load_from_data_frame(
@@ -309,31 +298,25 @@ class CocoonTestsTransactions(unittest.TestCase):
             batch_size=batch_size,
         )
 
-        self.assertGreater(len(responses["transactions"]["success"]), 0)
+        assert len(responses["transactions"]["success"]) > 0
 
-        self.assertEqual(
-            len(responses["transactions"]["errors"]),
-            0,
-            [
-                (error.status, error.reason, error.body)
-                for error in responses["transactions"]["errors"]
-            ],
-        )
+        assert len(responses["transactions"]["errors"]) == 0, [
+            (error.status, error.reason, error.body)
+            for error in responses["transactions"]["errors"]
+        ]
 
         # Assert that by default no unmatched_identifiers are returned in the response
-        self.assertFalse(responses["transactions"].get("unmatched_identifiers", False))
+        assert not responses["transactions"].get("unmatched_identifiers", False)
 
-        self.assertTrue(
-            expr=all(
-                isinstance(success_response.version, expected_outcome)
-                for success_response in responses["transactions"]["success"]
-            )
+        assert all(
+            isinstance(success_response.version, expected_outcome)
+            for success_response in responses["transactions"]["success"]
         )
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "scope, mapping_required, mapping_optional, identifier_mapping, property_columns, properties_scope, expected_property_scope, expected_property_code",
         [
-            [
-                "Test standard transaction load",
+            (
                 f"prime_broker_test_dict_{uuid.uuid4()}",
                 {
                     "code": "portfolio_code",
@@ -358,9 +341,8 @@ class CocoonTestsTransactions(unittest.TestCase):
                 "operations001",
                 "operations001",
                 "location_region",
-            ],
-            [
-                "Test standard transaction load with scope",
+            ),
+            (
                 f"prime_broker_test_dict_{uuid.uuid4()}",
                 {
                     "code": "portfolio_code",
@@ -391,35 +373,24 @@ class CocoonTestsTransactions(unittest.TestCase):
                 "operations001",
                 "foo",
                 "My_location",
-            ],
-        ]
+            ),
+        ],
+        ids=[
+            "Test standard transaction load",
+            "Test standard transaction load with scope",
+        ],
     )
     def test_properties_dicts(
-            self,
-            _,
-            scope,
-            mapping_required,
-            mapping_optional,
-            identifier_mapping,
-            property_columns,
-            properties_scope,
-            expected_property_scope,
-            expected_property_code,
+        self,
+        scope,
+        mapping_required,
+        mapping_optional,
+        identifier_mapping,
+        property_columns,
+        properties_scope,
+        expected_property_scope,
+        expected_property_code,
     ) -> None:
-        """
-        Test that transactions
-
-        :param str scope: The scope of the portfolios to load the transactions into
-        :param dict{str, str} mapping_required: The dictionary mapping the dataframe fields to LUSID's required base transaction/holding schema
-        :param dict{str, str} mapping_optional: The dictionary mapping the dataframe fields to LUSID's optional base transaction/holding schema
-        :param dict{str, str} identifier_mapping: The dictionary mapping of LUSID instrument identifiers to identifiers in the dataframe
-        :param list[str] property_columns: The columns to create properties for
-        :param str properties_scope: The scope to add the properties to
-        :param str expected_property_scope: The expected scope
-        :param str expected_property_code: The expected code
-
-        :return: None
-        """
         data_frame = pd.read_csv(
             Path(__file__).parent.joinpath("data/global-fund-combined-transactions.csv")
         )
@@ -454,7 +425,7 @@ class CocoonTestsTransactions(unittest.TestCase):
         )
 
         transactions_from_response = self.api_factory.build(
-            lusid.api.TransactionPortfoliosApi
+            lusid.TransactionPortfoliosApi
         ).get_transactions(
             scope=scope,
             code="GlobalCreditFund",
@@ -466,53 +437,44 @@ class CocoonTestsTransactions(unittest.TestCase):
         )
 
         for tx in transactions_from_response.values:
-            self.assertIsNotNone(
-                tx.properties.get(
-                    f"Transaction/{expected_property_scope}/{expected_property_code}"
-                ),
-                tx,
-            )
+            assert (tx.properties or {}).get(
+                f"Transaction/{expected_property_scope}/{expected_property_code}"
+            ) is not None, tx
 
         # Delete the portfolio at the end of the test
-        for portfolio in portfolio_response.get("portfolios").get("success"):
-            self.api_factory.build(lusid.api.PortfoliosApi).delete_portfolio(
+        for portfolio in (portfolio_response.get("portfolios") or {}).get("success") or []:
+            self.api_factory.build(lusid.PortfoliosApi).delete_portfolio(
                 scope=scope, code=portfolio.id.code
             )
-    @parameterized.expand(
+
+    @pytest.mark.parametrize(
+        "file_name, return_unmatched_items, expected_unmatched_transactions",
         [
-            [
-                "Test standard transaction load",
+            (
                 "data/global-fund-combined-transactions.csv",
                 True,
                 [],
-            ],
-            [
-                "Test standard transaction load with two unresolved instruments",
+            ),
+            (
                 "data/global-fund-combined-transactions-unresolved-instruments.csv",
                 True,
                 [
                     "unresolved_tx01",
                     "unresolved_tx02",
                 ],
-            ],
-        ]
+            ),
+        ],
+        ids=[
+            "Test standard transaction load",
+            "Test standard transaction load with two unresolved instruments",
+        ],
     )
     def test_load_from_data_frame_transactions_success_with_correct_unmatched_identifiers(
-            self,
-            _,
-            file_name,
-            return_unmatched_items,
-            expected_unmatched_transactions,
+        self,
+        file_name,
+        return_unmatched_items,
+        expected_unmatched_transactions,
     ) -> None:
-        """
-        Test that transactions are uploaded and have the expected response from load_from_data_frame
-
-        :param str file_name: The name of the test data file
-        :param bool return_unmatched_items: A flag to request the return of all objects with unresolved instruments
-        :param expected_unmatched_transactions: The expected unmatched transactions appended to the response
-
-        :return: None
-        """
         # Unchanged vars that have no need to be passed via param (they would count as duplicate lines)
         scope = "prime_broker_test"
         mapping_required = {
@@ -537,7 +499,7 @@ class CocoonTestsTransactions(unittest.TestCase):
         property_columns = ["exposure_counterparty", "compls", "val", "location_region"]
         properties_scope = "operations001"
         batch_size = None
-        expected_outcome = lusid.models.Version
+        expected_outcome = lusid.Version
 
         data_frame = pd.read_csv(Path(__file__).parent.joinpath(file_name))
 
@@ -555,34 +517,30 @@ class CocoonTestsTransactions(unittest.TestCase):
             return_unmatched_items=return_unmatched_items,
         )
 
-        self.assertGreater(len(responses["transactions"]["success"]), 0)
+        assert len(responses["transactions"]["success"]) > 0
 
-        self.assertEqual(len(responses["transactions"]["errors"]), 0)
+        assert len(responses["transactions"]["errors"]) == 0
 
         # Assert that the unmatched_transactions returned are as expected for each case
         # First check the count of transactions
-        self.assertEqual(
-            len(responses["transactions"].get("unmatched_items", False)),
-            len(expected_unmatched_transactions),
+        assert len(responses["transactions"].get("unmatched_items", False)) == len(
+            expected_unmatched_transactions
         )
         # Then check the transaction ids are the ones expected
-        self.assertCountEqual(
+        assert sorted(
             [
                 transaction.transaction_id
                 for transaction in responses["transactions"].get("unmatched_items", [])
-            ],
-            expected_unmatched_transactions,
-        )
+            ]
+        ) == sorted(expected_unmatched_transactions)
 
-        self.assertTrue(
-            expr=all(
-                isinstance(success_response.version, expected_outcome)
-                for success_response in responses["transactions"]["success"]
-            )
+        assert all(
+            isinstance(success_response.version, expected_outcome)
+            for success_response in responses["transactions"]["success"]
         )
 
     def test_return_unmatched_transactions_extracts_relevant_transactions_and_instruments(
-            self,
+        self,
     ):
         scope = "unmatched_transactions_test"
         code = "MIS_INST_FUND"
@@ -651,78 +609,62 @@ class CocoonTestsTransactions(unittest.TestCase):
             from_transaction_date="2000-01-01",
             to_transaction_date="2050-01-01",
         )
-        self.assertEqual(len(response_wide), 4)
+        assert len(response_wide) == 4
 
         # Assert that there are only two values returned
-        self.assertEqual(len(response_focused), 2)
+        assert len(response_focused) == 2
         # Assert that the transaction ids and instrument identifiers from the returned transactions match expectations
         response_dict = {
             transaction.transaction_id: transaction.instrument_identifiers
             for transaction in response_focused
         }
-        self.assertEqual(
-            response_dict.get("trd_0003"),
-            {
-                client_internal: "THIS_WILL_NOT_RESOLVE_1",
-                sedol: "FAKESEDOL1",
-                name: "THIS_WILL_NOT_RESOLVE_1",
-            },
-        )
-        self.assertEqual(
-            response_dict.get("trd_0004"),
-            {
-                client_internal: "THIS_WILL_NOT_RESOLVE_2",
-                sedol: "FAKESEDOL2",
-                name: "THIS_WILL_NOT_RESOLVE_2",
-            },
-        )
+        assert response_dict.get("trd_0003") == {
+            client_internal: "THIS_WILL_NOT_RESOLVE_1",
+            sedol: "FAKESEDOL1",
+            name: "THIS_WILL_NOT_RESOLVE_1",
+        }
+        assert response_dict.get("trd_0004") == {
+            client_internal: "THIS_WILL_NOT_RESOLVE_2",
+            sedol: "FAKESEDOL2",
+            name: "THIS_WILL_NOT_RESOLVE_2",
+        }
 
         # Delete the portfolio at the end of the test
-        self.api_factory.build(lusid.api.PortfoliosApi).delete_portfolio(
+        self.api_factory.build(lusid.PortfoliosApi).delete_portfolio(
             scope=scope, code=code
         )
 
-
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "data_frame_path, unmatched_transactions, expected_filtered_unmatched_transactions",
         [
-            [
-                "All returned unmatched transactions were in the upload",
+            (
                 "data/transactions_unmatched_instruments_all_in_upload.csv",
                 transaction_and_instrument_identifiers(trd_0003=True, trd_0004=True),
                 transaction_and_instrument_identifiers(trd_0003=True, trd_0004=True),
-            ],
-            [
-                "No returned unmatched transactions were in the upload",
+            ),
+            (
                 "data/transactions_unmatched_instruments_none_in_upload.csv",
                 transaction_and_instrument_identifiers(trd_0003=True, trd_0004=True),
                 transaction_and_instrument_identifiers(trd_0003=False, trd_0004=False),
-            ],
-            [
-                "Some of the returned unmatched transactions were in the upload",
+            ),
+            (
                 "data/transactions_unmatched_instruments_some_in_upload.csv",
                 transaction_and_instrument_identifiers(trd_0003=True, trd_0004=True),
                 transaction_and_instrument_identifiers(trd_0003=True, trd_0004=False),
-            ],
-        ]
+            ),
+        ],
+        ids=[
+            "All returned unmatched transactions were in the upload",
+            "No returned unmatched transactions were in the upload",
+            "Some of the returned unmatched transactions were in the upload",
+        ],
     )
     def test_filter_unmatched_transactions_method_only_returns_transactions_originally_present_in_dataframe(
-            self,
-            _,
-            data_frame_path,
-            unmatched_transactions,
-            expected_filtered_unmatched_transactions,
+        self,
+        data_frame_path,
+        unmatched_transactions,
+        expected_filtered_unmatched_transactions,
     ):
-        """
-        Test that unmatched transactions that were not part of the current load_from_data_frame operation are
-        filtered out of the final list.
-
-        :param str _: The name of the test
-        :param str data_frame_path: The name of the test data file
-        :param list unmatched_transactions: The raw list of unmatched transactions to be filtered
-        :param expected_filtered_unmatched_transactions: The expected unmatched transactions appended to the response
-
-        :return: None
-        """
         # Load the dataframe
         data_frame = pd.read_csv(Path(__file__).parent.joinpath(data_frame_path))
 
@@ -734,22 +676,16 @@ class CocoonTestsTransactions(unittest.TestCase):
         )
 
         # Assert that the transaction ids and identifiers from the transactions returned match up to the expected ones
-        self.assertCountEqual(
-            dict_for_comparison(filtered_unmatched_transactions),
-            dict_for_comparison(expected_filtered_unmatched_transactions),
+        assert set(dict_for_comparison(filtered_unmatched_transactions)) == set(
+            dict_for_comparison(expected_filtered_unmatched_transactions)
         )
 
-
     def test_filter_unmatched_transactions_can_paginate_responses_for_2001_transactions_returned(
-            self,
+        self,
     ):
         """
         The GetTransactions API will only return up to 2,000 transactions per request. This test is to verify that
         LPT can handle responses of greater length, expected to be split across multiple pages.
-
-        Returns
-        -------
-        Nothing.
         """
         scope = "unmatched_transactions_2k_test"
         identifier_mapping = {
@@ -794,7 +730,7 @@ class CocoonTestsTransactions(unittest.TestCase):
         )
 
         # Assert that the portfolio was created without any issues
-        self.assertEqual(len(portfolio_response.get("portfolios").get("errors")), 0)
+        assert len((portfolio_response.get("portfolios") or {}).get("errors") or []) == 0
 
         # Load in the transactions
         transactions_response = cocoon.cocoon.load_from_data_frame(
@@ -809,26 +745,25 @@ class CocoonTestsTransactions(unittest.TestCase):
             return_unmatched_items=True,
         )
 
-        self.assertGreater(len(transactions_response["transactions"]["success"]), 0)
-        self.assertEqual(len(transactions_response["transactions"]["errors"]), 0)
+        assert len(transactions_response["transactions"]["success"]) > 0
+        assert len(transactions_response["transactions"]["errors"]) == 0
 
         # Assert that the unmatched_items returned are as expected
-        self.assertEqual(
-            len(transactions_response["transactions"].get("unmatched_items", [])),
-            2001,
+        assert (
+            len(transactions_response["transactions"].get("unmatched_items", []))
+            == 2001
         )
 
         # Delete the portfolio at the end of the test
-        for portfolio in portfolio_response.get("portfolios").get("success"):
-            self.api_factory.build(lusid.api.PortfoliosApi).delete_portfolio(
+        for portfolio in (portfolio_response.get("portfolios") or {}).get("success") or []:
+            self.api_factory.build(lusid.PortfoliosApi).delete_portfolio(
                 scope=scope, code=portfolio.id.code
             )
 
-
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "scope, file_name, mapping_required, mapping_optional, identifier_mapping, property_columns, properties_scope, batch_size, sub_holding_keys, expected_sub_holdings_keys",
         [
-            [
-                "Test standard transaction load",
+            (
                 "load_dataframe_test",
                 "data/no-subholding-keys-transactions.csv",
                 {
@@ -855,22 +790,22 @@ class CocoonTestsTransactions(unittest.TestCase):
                 None,
                 ["SHK_data"],
                 ["Transaction/load_dataframe_test/SHK_data"],
-            ]
-        ]
+            ),
+        ],
+        ids=["Test standard transaction load"],
     )
     def test_load_from_dataframe_non_existent_subholding_keys(
-            self,
-            _,
-            scope,
-            file_name,
-            mapping_required,
-            mapping_optional,
-            identifier_mapping,
-            property_columns,
-            properties_scope,
-            batch_size,
-            sub_holding_keys,
-            expected_sub_holdings_keys,
+        self,
+        scope,
+        file_name,
+        mapping_required,
+        mapping_optional,
+        identifier_mapping,
+        property_columns,
+        properties_scope,
+        batch_size,
+        sub_holding_keys,
+        expected_sub_holdings_keys,
     ):
         """
         This checks whether load_from_data_frame creates subholding keys for transactions when they don't already exist.
@@ -891,12 +826,12 @@ class CocoonTestsTransactions(unittest.TestCase):
         # create the portfolio we're going to use
         transaction_portfolio_api.create_portfolio(
             scope,
-            {
-                "displayName": "test_load_from_dataframe_non_existent_subholding_keys portfolio",
-                "code": "no-SHK",
-                "baseCurrency": "GBP",
-                "created": "2017-06-22T00:00:00.0000000+00:00",
-            },
+            lusid.CreateTransactionPortfolioRequest(
+                displayName="test_load_from_dataframe_non_existent_subholding_keys portfolio",
+                code="no-SHK",
+                baseCurrency="GBP",
+                created=datetime.datetime(2017, 6, 22, tzinfo=datetime.timezone.utc),
+            ),
         )
 
         # load the data
@@ -928,24 +863,24 @@ class CocoonTestsTransactions(unittest.TestCase):
         )
 
         # check that the sub holding key is a property of the two transactions
-        self.assertTrue(
+        assert (
             "Transaction/load_dataframe_test/SHK_data"
-            in transactions.values[0].properties.keys()
+            in (transactions.values[0].properties or {}).keys()
         )
-        self.assertTrue(
+        assert (
             "Transaction/load_dataframe_test/SHK_data"
-            in transactions.values[1].properties.keys()
+            in (transactions.values[1].properties or {}).keys()
         )
 
         # check that the property is a sub-holding key in the portfolio
-        self.assertSetEqual(
-            set(portfolio_details.sub_holding_keys), set(expected_sub_holdings_keys)
+        assert set(portfolio_details.sub_holding_keys or []) == set(
+            expected_sub_holdings_keys
         )
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "scope, file_name, mapping_required, mapping_optional, identifier_mapping, transactions_commit_mode, expected_outcome",
         [
-            [
-                "Test standard transaction load with no commit mode",
+            (
                 "prime_broker_test",
                 "data/global-fund-combined-transactions.csv",
                 {
@@ -968,10 +903,9 @@ class CocoonTestsTransactions(unittest.TestCase):
                     "Currency": "currency_transaction",
                 },
                 None,
-                None
-            ],
-            [
-                "Test standard transaction load with incorrect commit mode",
+                None,
+            ),
+            (
                 "prime_broker_test",
                 "data/global-fund-combined-transactions.csv",
                 {
@@ -994,10 +928,9 @@ class CocoonTestsTransactions(unittest.TestCase):
                     "Currency": "currency_transaction",
                 },
                 "Not_a_valid_commit_mode",
-                None
-            ],
-            [
-                "Test standard transaction load with partial commit mode",
+                None,
+            ),
+            (
                 "prime_broker_test",
                 "data/global-fund-combined-transactions.csv",
                 {
@@ -1020,10 +953,9 @@ class CocoonTestsTransactions(unittest.TestCase):
                     "Currency": "currency_transaction",
                 },
                 "Partial",
-                9
-            ],
-            [
-                "Test standard transaction load with atomic commit mode",
+                9,
+            ),
+            (
                 "prime_broker_test",
                 "data/global-fund-combined-transactions.csv",
                 {
@@ -1046,39 +978,35 @@ class CocoonTestsTransactions(unittest.TestCase):
                     "Currency": "currency_transaction",
                 },
                 "Atomic",
-                9
-            ],
-        ]
+                9,
+            ),
+        ],
+        ids=[
+            "Test standard transaction load with no commit mode",
+            "Test standard transaction load with incorrect commit mode",
+            "Test standard transaction load with partial commit mode",
+            "Test standard transaction load with atomic commit mode",
+        ],
     )
     def test_load_from_data_frame_transactions_with_commit_mode(
-            self,
-            _,
-            scope,
-            file_name,
-            mapping_required,
-            mapping_optional,
-            identifier_mapping,
-            transactions_commit_mode,
-            expected_outcome
+        self,
+        scope,
+        file_name,
+        mapping_required,
+        mapping_optional,
+        identifier_mapping,
+        transactions_commit_mode,
+        expected_outcome,
     ) -> None:
-        """
-        Test that transactions
-
-        :param str scope: The scope of the portfolios to load the transactions into
-        :param str file_name: The name of the test data file
-        :param dict{str, str} mapping_required: The dictionary mapping the dataframe fields to LUSID's required base transaction/holding schema
-        :param dict{str, str} mapping_optional: The dictionary mapping the dataframe fields to LUSID's optional base transaction/holding schema
-        :param dict{str, str} identifier_mapping: The dictionary mapping of LUSID instrument identifiers to identifiers in the dataframe
-        :param str transactions_commit_mode: The transaction commit mode to try and execute
-
-        :return: None
-        """
         # Arrange
         data_frame = pd.read_csv(Path(__file__).parent.joinpath(file_name))
 
         # Act
-        if transactions_commit_mode is None or transactions_commit_mode not in ('Atomic', "Partial"):
-            with self.assertRaises(KeyError):
+        if transactions_commit_mode is None or transactions_commit_mode not in (
+            "Atomic",
+            "Partial",
+        ):
+            with pytest.raises(KeyError):
                 cocoon.cocoon.load_from_data_frame(
                     api_factory=self.api_factory,
                     scope=scope,
@@ -1086,9 +1014,9 @@ class CocoonTestsTransactions(unittest.TestCase):
                     mapping_required=mapping_required,
                     mapping_optional=mapping_optional,
                     file_type="transactions_with_commit_mode",
-                    identifier_mapping=identifier_mapping
+                    identifier_mapping=identifier_mapping,
                 )
-            return True
+            return
 
         response = cocoon.cocoon.load_from_data_frame(
             api_factory=self.api_factory,
@@ -1098,19 +1026,19 @@ class CocoonTestsTransactions(unittest.TestCase):
             mapping_optional=mapping_optional,
             file_type="transactions_with_commit_mode",
             transactions_commit_mode=transactions_commit_mode,
-            identifier_mapping=identifier_mapping
+            identifier_mapping=identifier_mapping,
         )
 
         # Assert
-        self.assertEqual(
-            len(response["transactions_with_commit_modes"]["success"][0].values),
-            expected_outcome
+        assert (
+            len(response["transactions_with_commit_modes"]["success"][0].values)
+            == expected_outcome
         )
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "scope, file_name, mapping_required, mapping_optional, identifier_mapping, transactions_commit_mode, expected_outcome",
         [
-            [
-                "Test failed load with atomic commit mode",
+            (
                 "prime_broker_test",
                 "data/global-fund-combined-transactions-with-failed-transactions.csv",
                 {
@@ -1133,34 +1061,21 @@ class CocoonTestsTransactions(unittest.TestCase):
                     "Currency": "currency_transaction",
                 },
                 "Atomic",
-                0
-            ],
-
-        ]
+                0,
+            ),
+        ],
+        ids=["Test failed load with atomic commit mode"],
     )
     def test_load_from_data_frame_transactions_with_atomic_commit_mode_expect_failures(
-            self,
-            _,
-            scope,
-            file_name,
-            mapping_required,
-            mapping_optional,
-            identifier_mapping,
-            transactions_commit_mode,
-            expected_outcome
+        self,
+        scope,
+        file_name,
+        mapping_required,
+        mapping_optional,
+        identifier_mapping,
+        transactions_commit_mode,
+        expected_outcome,
     ) -> None:
-        """
-        Test that transactions
-
-        :param str scope: The scope of the portfolios to load the transactions into
-        :param str file_name: The name of the test data file
-        :param dict{str, str} mapping_required: The dictionary mapping the dataframe fields to LUSID's required base transaction/holding schema
-        :param dict{str, str} mapping_optional: The dictionary mapping the dataframe fields to LUSID's optional base transaction/holding schema
-        :param dict{str, str} identifier_mapping: The dictionary mapping of LUSID instrument identifiers to identifiers in the dataframe
-        :param str transactions_commit_mode: The transaction commit mode to try and execute
-
-        :return: None
-        """
         # Arrange
         data_frame = pd.read_csv(Path(__file__).parent.joinpath(file_name))
 
@@ -1173,19 +1088,18 @@ class CocoonTestsTransactions(unittest.TestCase):
             mapping_optional=mapping_optional,
             file_type="transactions_with_commit_mode",
             transactions_commit_mode=transactions_commit_mode,
-            identifier_mapping=identifier_mapping
+            identifier_mapping=identifier_mapping,
         )
 
         # Assert
-        self.assertEqual(
-            len(response["transactions_with_commit_modes"]["success"]),
-            expected_outcome
+        assert (
+            len(response["transactions_with_commit_modes"]["success"]) == expected_outcome
         )
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "scope, file_name, mapping_required, mapping_optional, identifier_mapping, transactions_commit_mode, expected_outcome",
         [
-            [
-                "Test failed load with partial commit mode",
+            (
                 "prime_broker_test",
                 "data/global-fund-combined-transactions-with-failed-transactions.csv",
                 {
@@ -1208,33 +1122,21 @@ class CocoonTestsTransactions(unittest.TestCase):
                     "Currency": "currency_transaction",
                 },
                 "Partial",
-                8
-            ]
-        ]
+                8,
+            ),
+        ],
+        ids=["Test failed load with partial commit mode"],
     )
     def test_load_from_data_frame_transactions_with_partial_commit_mode_expect_failures(
-            self,
-            _,
-            scope,
-            file_name,
-            mapping_required,
-            mapping_optional,
-            identifier_mapping,
-            transactions_commit_mode,
-            expected_outcome
+        self,
+        scope,
+        file_name,
+        mapping_required,
+        mapping_optional,
+        identifier_mapping,
+        transactions_commit_mode,
+        expected_outcome,
     ) -> None:
-        """
-        Test that transactions
-
-        :param str scope: The scope of the portfolios to load the transactions into
-        :param str file_name: The name of the test data file
-        :param dict{str, str} mapping_required: The dictionary mapping the dataframe fields to LUSID's required base transaction/holding schema
-        :param dict{str, str} mapping_optional: The dictionary mapping the dataframe fields to LUSID's optional base transaction/holding schema
-        :param dict{str, str} identifier_mapping: The dictionary mapping of LUSID instrument identifiers to identifiers in the dataframe
-        :param str transactions_commit_mode: The transaction commit mode to try and execute
-
-        :return: None
-        """
         # Arrange
         data_frame = pd.read_csv(Path(__file__).parent.joinpath(file_name))
 
@@ -1247,17 +1149,17 @@ class CocoonTestsTransactions(unittest.TestCase):
             mapping_optional=mapping_optional,
             file_type="transactions_with_commit_mode",
             transactions_commit_mode=transactions_commit_mode,
-            identifier_mapping=identifier_mapping
+            identifier_mapping=identifier_mapping,
         )
 
         # Assert
-        self.assertEqual(
-            len(response["transactions_with_commit_modes"]["success"][0].values),
-            expected_outcome
+        assert (
+            len(response["transactions_with_commit_modes"]["success"][0].values)
+            == expected_outcome
         )
 
     @classmethod
-    def tearDownClass(cls):
+    def teardown_class(cls):
         # remove portfolios/properties created in test_load_from_dataframe_non_existent_subholding_keys
         try:
             cls.api_factory.build(
@@ -1265,7 +1167,7 @@ class CocoonTestsTransactions(unittest.TestCase):
             ).delete_property_definition(
                 "Transaction", "load_dataframe_test", "SHK_data"
             )
-        except lusid.ApiException as e:
+        except ApiException as e:
             if "domain" not in str(e.body) and "PropertyNotDefined" not in str(e.body):
                 raise e
 
@@ -1273,6 +1175,6 @@ class CocoonTestsTransactions(unittest.TestCase):
             cls.api_factory.build(lusid.PortfoliosApi).delete_portfolio(
                 "load_dataframe_test", "no-SHK"
             )
-        except lusid.ApiException as e:
+        except ApiException as e:
             if "PortfolioNotFound" not in str(e.body):
                 raise e

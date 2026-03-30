@@ -1,27 +1,26 @@
 import os
-import unittest
+import pytest
 from pathlib import Path
 import pandas as pd
-import lusid
+from finbourne.sdk.extensions import SyncApiClientFactory
 
 from finbourne_sdk_utils import cocoon as cocoon
-from parameterized import parameterized
 from finbourne_sdk_utils import logger
 import logging
 
 
-class CocoonTestsFailures(unittest.TestCase):
+class TestCocoonFailures:
     api_factory = None
 
     @classmethod
-    def setUpClass(cls) -> None:
-        secrets_file = Path(__file__).parent.parent.parent.joinpath("secrets.json")
-        cls.api_factory = lusid.SyncApiClientFactory()
+    def setup_class(cls) -> None:
+        cls.api_factory = SyncApiClientFactory()
         cls.logger = logger.LusidLogger(os.getenv("FBN_LOG_LEVEL", "info"))
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "test_name, scope, file_name, mapping_required, mapping_optional, identifier_mapping, property_columns, properties_scope, file_type, sub_holding_keys, expected_exception",
         [
-            [
+            (
                 "A file with a missing unique identifier for an instrument",
                 "TestScope1",
                 "data/global-fund-combined-instrument-master-missing-identifiers.csv",
@@ -33,8 +32,8 @@ class CocoonTestsFailures(unittest.TestCase):
                 "instruments",
                 None,
                 ValueError,
-            ],
-            [
+            ),
+            (
                 "No identifiers specified in the identifier mapping",
                 "TestScope1",
                 "data/global-fund-combined-instrument-master.csv",
@@ -46,8 +45,8 @@ class CocoonTestsFailures(unittest.TestCase):
                 "instruments",
                 None,
                 ValueError,
-            ],
-            [
+            ),
+            (
                 "Another way of missing the identifier mapping",
                 "TestScope1",
                 "data/global-fund-combined-instrument-master.csv",
@@ -59,8 +58,8 @@ class CocoonTestsFailures(unittest.TestCase):
                 "instruments",
                 None,
                 ValueError,
-            ],
-            [
+            ),
+            (
                 "A missing required attribute in the required mapping",
                 "TestScope1",
                 "data/global-fund-combined-instrument-master.csv",
@@ -72,8 +71,8 @@ class CocoonTestsFailures(unittest.TestCase):
                 "instruments",
                 None,
                 ValueError,
-            ],
-            [
+            ),
+            (
                 "None provided for the required mapping",
                 "TestScope1",
                 "data/global-fund-combined-instrument-master.csv",
@@ -85,8 +84,8 @@ class CocoonTestsFailures(unittest.TestCase):
                 "instruments",
                 None,
                 TypeError,
-            ],
-            [
+            ),
+            (
                 "A file with missing names for two instruments",
                 "TestScope1",
                 "data/global-fund-combined-instrument-master-missing-names.csv",
@@ -98,8 +97,8 @@ class CocoonTestsFailures(unittest.TestCase):
                 "instruments",
                 None,
                 ValueError,
-            ],
-            [
+            ),
+            (
                 "A property column list that contains a property not in the dataframe",
                 "TestScope1",
                 "data/global-fund-combined-instrument-master-missing-identifiers.csv",
@@ -111,8 +110,8 @@ class CocoonTestsFailures(unittest.TestCase):
                 "instruments",
                 None,
                 ValueError,
-            ],
-            [
+            ),
+            (
                 "Non unique portfolios in the file",
                 "prime_broker_test",
                 "data/metamorph_portfolios.csv",
@@ -129,8 +128,8 @@ class CocoonTestsFailures(unittest.TestCase):
                 "portfolios",
                 None,
                 ValueError,
-            ],
-            [
+            ),
+            (
                 "Misnamed required parameter effective_date rather than effective_at",
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
@@ -157,8 +156,8 @@ class CocoonTestsFailures(unittest.TestCase):
                 "holdings",
                 None,
                 ValueError,
-            ],
-            [
+            ),
+            (
                 "Duplication of transaction ids",
                 "prime_broker_test",
                 "data/global-fund-combined-transactions-duplicate-id.csv",
@@ -186,8 +185,8 @@ class CocoonTestsFailures(unittest.TestCase):
                 "transaction",
                 None,
                 ValueError,
-            ],
-            [
+            ),
+            (
                 "Missing portfolio code",
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
@@ -210,8 +209,8 @@ class CocoonTestsFailures(unittest.TestCase):
                 "holdings",
                 None,
                 ValueError,
-            ],
-            [
+            ),
+            (
                 "A file type that is not supported",
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
@@ -238,8 +237,8 @@ class CocoonTestsFailures(unittest.TestCase):
                 "reference",
                 None,
                 ValueError,
-            ],
-            [
+            ),
+            (
                 "Load with sub-holding-keys based on a column that does not exist in the file",
                 "prime_broker_test",
                 "data/holdings-example-unique-date.csv",
@@ -266,8 +265,8 @@ class CocoonTestsFailures(unittest.TestCase):
                 "holdings",
                 ["Strategy Tag"],
                 ValueError,
-            ],
-            [
+            ),
+            (
                 "Duplicate column in the source file with first column empty",
                 "prime_broker_test",
                 "data/holdings-example-unique-date-duplicate-column-empty.csv",
@@ -294,8 +293,8 @@ class CocoonTestsFailures(unittest.TestCase):
                 "holdings",
                 None,
                 ValueError,
-            ],
-        ]
+            ),
+        ],
     )
     def test_load_from_data_frame_failure(
         self,
@@ -330,13 +329,13 @@ class CocoonTestsFailures(unittest.TestCase):
         ignore = ["Non unique portfolios in the file", "Duplication of transaction ids"]
 
         if test_name in ignore:
-            self.skipTest("not yet implemented")
+            pytest.skip("not yet implemented")
 
         data_frame = pd.read_csv(Path(__file__).parent.joinpath(file_name))
 
         logging.info(f"Expecting exception {expected_exception}\n")
-        
-        with self.assertRaises(expected_exception):
+
+        with pytest.raises(expected_exception):
 
             cocoon.cocoon.load_from_data_frame(
                 api_factory=self.api_factory,
@@ -351,10 +350,10 @@ class CocoonTestsFailures(unittest.TestCase):
                 sub_holding_keys=sub_holding_keys,
             )
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "scope, file_name, mapping_required, mapping_optional, identifier_mapping, property_columns, properties_scope, file_type, sub_holding_keys, expected_exception",
         [
-            [
-                "Multi-index DataFrame",
+            (
                 "TestScope1",
                 "data/global-fund-combined-instrument-master-missing-identifiers.csv",
                 {"name": "instrument_name"},
@@ -365,12 +364,11 @@ class CocoonTestsFailures(unittest.TestCase):
                 "instruments",
                 None,
                 TypeError,
-            ]
-        ]
+            ),
+        ],
     )
     def test_load_from_data_frame_failure_multi_index_dataframe(
         self,
-        _,
         scope,
         file_name,
         mapping_required,
@@ -406,9 +404,9 @@ class CocoonTestsFailures(unittest.TestCase):
             {column: "first" for column in columns}
         )
 
-        logging.info(f"Expecting exception {expected_exception}\n")   
+        logging.info(f"Expecting exception {expected_exception}\n")
 
-        with self.assertRaises(expected_exception):
+        with pytest.raises(expected_exception):
 
             cocoon.cocoon.load_from_data_frame(
                 api_factory=self.api_factory,

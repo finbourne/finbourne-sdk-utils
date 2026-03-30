@@ -1,11 +1,9 @@
 import argparse
 import copy
-import csv
 import os
 import uuid
 import re
 import numpy as np
-import lusid
 from collections.abc import Mapping
 import pandas as pd
 from detect_delimiter import detect
@@ -16,13 +14,12 @@ import functools
 from pathlib import Path
 
 from finbourne_sdk_utils.cocoon.dateorcutlabel import DateOrCutLabel
-import lusid.models as models
+import finbourne.sdk.services.lusid.models as models
 import logging
 import time as default_time
 from finbourne_sdk_utils.cocoon.validator import Validator
 import types
 import typing
-import pydantic.v1
 
 
 def checkargs(function: typing.Callable) -> typing.Callable:
@@ -150,7 +147,7 @@ def populate_model(
     optional_mapping: dict,
     row: pd.Series,
     properties,
-    identifiers: dict = None,
+    identifiers: dict | None = None,
     sub_holding_keys=None,
 ) -> typing.Callable:
     """
@@ -180,7 +177,7 @@ def populate_model(
     """
 
     # Check that the provided model name actually exists
-    model_object = getattr(lusid.models, model_object_name, None)
+    model_object = getattr(models, model_object_name, None)
 
     if model_object is None:
         raise TypeError("The provided model_object is not a lusid.model object")
@@ -207,7 +204,7 @@ def set_attributes_recursive(
     mapping: dict,
     row: pd.Series,
     properties=None,
-    identifiers: dict = None,
+    identifiers: dict | None = None,
     sub_holding_keys=None,
 ):
     """
@@ -272,7 +269,7 @@ def set_attributes_recursive(
                 obj_init_values[key] = {
                     str_key: row[str_value]
                     for str_key, str_value in mapping[key].items()
-                    if not pd.isna(row[str_value])
+                    if not typing.cast(bool, pd.isna(row[str_value]))
                 }
             else:
                 obj_init_values[key] = additional_attributes[key]
@@ -288,7 +285,7 @@ def set_attributes_recursive(
         # If this is the last object and there is no more nesting set the value from the row
         if not isinstance(mapping[key], dict):
             # If this exists in the mapping with a value and there is a value in the row for it
-            if mapping[key] is not None and not pd.isna(row[mapping[key]]):
+            if mapping[key] is not None and not typing.cast(bool, pd.isna(row[mapping[key]])):
                 # Converts to a date if it is a date field
                 if "date" in key or "created" in key or "effective_at" in key:
                     obj_init_values[key] = str(DateOrCutLabel(row[mapping[key]]))
@@ -313,7 +310,7 @@ def set_attributes_recursive(
 
             # Call the function recursively
             value = set_attributes_recursive(
-                model_object=getattr(lusid.models, attribute_type),
+                model_object=getattr(models, attribute_type),
                 mapping=mapping[key],
                 row=row,
             )
@@ -323,7 +320,7 @@ def set_attributes_recursive(
     """
     If all attributes are None propagate None rather than a model filled with Nones. For example if a CorporateActionSourceId
     has no scope or code return build a model with CorporateActionSourceId = None rather than CorporateActionSourceId = 
-    lusid.models.ResourceId(scope=None, code=None)
+    lusid.ResourceId(scope=None, code=None)
     
     """
     if total_count == none_count or missing_value:
@@ -342,7 +339,7 @@ def set_attributes_recursive(
 
         discriminator_field = camel_case_to_pep_8(discriminatorFieldCamelCase)
 
-        class_map = getattr(instance, "_"+ type(instance).__name__ + "__discriminator_value_class_map");
+        class_map = getattr(instance, "_"+ type(instance).__name__ + "__discriminator_value_class_map")
         
         class_alias = getattr(instance, discriminator_field )
         
@@ -352,14 +349,14 @@ def set_attributes_recursive(
             raise ValueError(f"Could not find a class for the discriminator value {class_alias} in the class map {class_map}") from e
         
         return set_attributes_recursive(
-            model_object=getattr(lusid.models, actual_class), mapping=mapping, row=row,
+            model_object=getattr(models, actual_class), mapping=mapping, row=row,
         )
 
     return instance
 
 
 @checkargs
-def update_dict(orig_dict: dict, new_dict) -> None:
+def update_dict(orig_dict: dict, new_dict) -> dict:
     """
     This is used to update a dictionary with another dictionary. Using the default Python update method does not merge
     nested dictionaries. This method allows for this. This modifies the original dictionary in place.
@@ -500,7 +497,7 @@ def generate_required_attributes_list():
 def verify_all_required_attributes_mapped(
     mapping: dict,
     model_object_name: str,
-    exempt_attributes: list = None,
+    exempt_attributes: list | None = None,
     key_separator: str = ".",
 ) -> None:
     """
@@ -525,16 +522,17 @@ def verify_all_required_attributes_mapped(
     """
 
     # Check that the provided model name actually exists
-    model_object = getattr(lusid.models, model_object_name, None)
+    model_object = getattr(models, model_object_name, None)
 
     if model_object is None:
         raise TypeError("The provided model_object is not a lusid.model object")
 
     # Convert a None to an empty list
-    exempt_attributes = (
+    exempt_attributes = typing.cast(
+        list,
         Validator(exempt_attributes, "exempt_attributes")
         .set_default_value_if_none([])
-        .value
+        .value,
     )
 
     # Gets the required attributes for this model
@@ -556,63 +554,41 @@ def verify_all_required_attributes_mapped(
                              add them."""
         )
 
+def _annotation_to_type_str(annotation) -> str:
+    """Convert a Pydantic v2 model_fields annotation to a type string compatible with
+    extract_lusid_model_from_attribute_type."""
+    import typing
+    origin = typing.get_origin(annotation)
+    args = typing.get_args(annotation)
+
+    if origin is typing.Union:
+        non_none = [a for a in args if a is not type(None)]
+        if len(non_none) == 1:
+            return f"Optional[{_annotation_to_type_str(non_none[0])}]"
+        return str(annotation)
+
+    if origin is dict:
+        if len(args) == 2:
+            val_name = getattr(args[1], "__name__", str(args[1]))
+            return f"dict(str, {val_name})"
+        return "dict"
+
+    if origin is list:
+        if args:
+            item_name = getattr(args[0], "__name__", str(args[0]))
+            return f"List[{item_name}]"
+        return "list"
+
+    return getattr(annotation, "__name__", str(annotation))
+
+
 def get_attributes_and_types(model_object):
-    
-    
+
     attributes = {}
 
-    # __fields__ is a pydantic.v1 property
-    for index, (key, value) in enumerate(model_object.__fields__.items()):
-        
-        nested_type = None
-      
-        attribute_type = str(value)
-        
-        match = re.search(r"type=([A-Za-z\[\], ]+)\s", attribute_type)
+    for key, field_info in model_object.model_fields.items():
+        attributes[key] = _annotation_to_type_str(field_info.annotation)
 
-        if match:
-            attribute_type = match.group(1)
-            
-        optional = False
-        optionalStr = "Optional["
-        
-        if attribute_type.startswith(optionalStr):
-            attribute_type = attribute_type.split(optionalStr)[1]
-            attribute_type = attribute_type[0:len(attribute_type)-1]
-            optional = True
-        
-        """  # If the attribute type is a mapping e.g. Mapping[str, InstrumentIdValue], extract the type  
-        if "Mapping" in attribute_type:
-            attribute_type = attribute_type.split(", ")[1].rstrip("]")
-            nested_type = "Mapping"
-            
-        # If the attribute type is a dictionary e.g. dict(str, InstrumentIdValue), extract the type  
-        
-        if "dict" in attribute_type:
-            attribute_type = attribute_type.split(", ")[1].rstrip(")")
-            nested_type = "dict"
-        # If it is a list e.g. list[ModelProperty] extract the type
-        if "list" in attribute_type:
-            attribute_type = attribute_type.split("list[")[1].rstrip("]")
-            nested_type = "list"
-            
-        if "List" in attribute_type:
-            attribute_type = attribute_type.split("List[")[1].rstrip("]")
-            nested_type = "list" 
-        """
-                
-    
-        
-        attributes[key] = attribute_type
-
-    
-    """     # Get the members of the object
-    for attr_name, attr_value in inspect.getmembers(model_object):
-        # Check if it's a data attribute (not a method or function)
-        if not callable(attr_value) and not attr_name.startswith('__'):
-            # Get the type of the attribute
-            attr_type = type(attr_value).__name__
-            attributes[attr_name] = attr_type """
     return attributes
 
 @checkargs
@@ -661,7 +637,7 @@ def get_required_attributes_model_recursive(model_object, key_separator: str = "
             ) = extract_lusid_model_from_attribute_type(str(required_attribute_type))
 
             nested_required_attributes = get_required_attributes_model_recursive(
-                model_object=getattr(lusid.models, required_attribute_type),
+                model_object=getattr(models, required_attribute_type),
             )
 
             for nested_required_attribute in nested_required_attributes:
@@ -693,25 +669,11 @@ def get_required_attributes_from_model(model_object) -> list:
     """
 
     required_attributes = []
-    
-    # Use pydantic's __fields__ to determine required fields
-    # This is more reliable than parsing source code
-    if hasattr(model_object, '__fields__'):
-        for field_name, field_info in model_object.__fields__.items():
-            # In Pydantic v1, required fields have field_info.required = True
-            if field_info.required:
-                required_attributes.append(field_name)
-    else:
-        # Fallback to old regex-based approach for backwards compatibility
-        # Get the source code for the model
-        model_details = inspect.getsource(model_object)
 
-        # bit of cleansing to aid the regex
-        model_details = model_details.replace('"""','')
-        model_details = model_details.replace( r"\n","\n")
-        
-        required_attributes = re.findall(r'(\w+):.*?= Field\(\.\.\.,', model_details)
-    
+    for field_name, field_info in model_object.model_fields.items():
+        if field_info.is_required():
+            required_attributes.append(field_name)
+
     return required_attributes
 
 
@@ -794,7 +756,7 @@ def check_nested_model(required_attribute_type: str) -> bool:
         required_attribute_type
     )
 
-    top_level_model = getattr(lusid.models, required_attribute_type, None)
+    top_level_model = getattr(models, required_attribute_type, None)
 
     if top_level_model is None:
         return False
@@ -924,16 +886,14 @@ def handle_nested_default_and_column_mapping(
                 ].fillna(value["default"])
 
             # If there is only a default specified, create a new column filled with the default
-            elif not ("column" in list(value.keys())) and (
+            elif "column" not in list(value.keys()) and (
                 "default" in list(value.keys())
             ):
                 mapping_updated[key] = f"LUSID.{key}"
                 data_frame[mapping_updated[key]] = value["default"]
 
             # If there is only a column specified unnest it
-            elif ("column" in list(value.keys())) and not (
-                "default" in list(value.keys())
-            ):
+            elif ("column" in list(value.keys())) and "default" not in list(value.keys()):
                 mapping_updated[key] = value["column"]
 
             else:
@@ -975,7 +935,7 @@ def handle_nested_default_and_column_mapping(
     return data_frame, mapping_updated
 
 
-def load_json_file(file_path: str) -> dict:
+def load_json_file(file_path: str | Path) -> dict:
     """
 
     Parameters
@@ -1018,7 +978,6 @@ def load_data_to_df_and_detect_delimiter(args: dict) -> pd.DataFrame:
 
     with open(args["file_path"], "r") as read_file:
         logging.info(f"loading data from {args['file_path']}")
-        data = csv.reader(read_file, lineterminator=args["line_terminator"])
 
         # iterate over data in unrelated lines to get to the first line of data that we are interested in
         for pre_amble in range(args["num_header"]):
@@ -1051,7 +1010,13 @@ def load_data_to_df_and_detect_delimiter(args: dict) -> pd.DataFrame:
 
 
 def get_delimiter(sample_string: str):
-    return detect(sample_string).replace("\\", "\\\\")
+    detected_delimiter = detect(sample_string)
+    if detected_delimiter is None:
+        raise ValueError(
+            f"Unable to detect delimiter from first line of data: {sample_string}"
+        )
+    return detected_delimiter.replace("\\", "\\\\")
+    
 
 
 def check_mapping_fields_exist(
@@ -1066,7 +1031,7 @@ def check_mapping_fields_exist(
         list of items to search for
     search_list : list[str]
         list to search in
-    file_type : list[str]
+    file_type : str
         the file type of the data eg.instruments, holdings, transactions
 
     Returns
@@ -1087,7 +1052,7 @@ def check_mapping_fields_exist(
     return missing_fields
 
 
-def parse_args(args: dict):
+def parse_args(args: list[str] | None = None):
     """
     Argument parser for command line apps
 
@@ -1346,9 +1311,9 @@ def populate_currency_identifier_for_LUSID(
             currency_code = row[cash_flag_specification["implicit"]]
         else:
             err = (
-                f"No cash identifiers were specified as a list, without any explicit currency codes and no 'implicit'"
-                f" field containing the name of a column containing currency codes exists. Please reformat cash_flag "
-                f"inside mapping file correctly"
+                "No cash identifiers were specified as a list, without any explicit currency codes and no 'implicit'"
+                " field containing the name of a column containing currency codes exists. Please reformat cash_flag "
+                "inside mapping file correctly"
             )
             raise ValueError(err)
     else:
@@ -1384,7 +1349,7 @@ def validate_mapping_file_structure(mapping: dict, columns: list, file_type: str
 
     # file_type
     domain_lookup = load_json_file("config/domain_settings.json")
-    file_type_check = (
+    (
         Validator(file_type, "file_type")
         .make_singular()
         .make_lower()
@@ -1406,7 +1371,7 @@ def validate_mapping_file_structure(mapping: dict, columns: list, file_type: str
                     mapping[file_type]["required"].values(), columns, "required"
                 )
     else:
-        raise ValueError(f"'required' mapping field not provided in mapping")
+        raise ValueError("'required' mapping field not provided in mapping")
 
     # optional
     if "optional" in mapping.keys():
@@ -1450,7 +1415,7 @@ def strip_whitespace(df: pd.DataFrame, columns: list) -> pd.DataFrame:
     return stripped_df
 
 
-def generate_time_based_unique_id(time_generator: None):
+def generate_time_based_unique_id(time_generator: types.ModuleType | None = None):
     """
     Generates a unique ID based on the time since epoch.
 
@@ -1519,8 +1484,8 @@ def create_scope_id(time_generator=None, use_uuid=False):
 def default_fx_forward_model(
     df: pd.DataFrame,
     fx_code: str,
-    func_transaction_units: typing.Callable[[], bool],
-    func_total_consideration: typing.Callable[[], bool],
+    func_transaction_units: typing.Callable[[], bool] | None,
+    func_total_consideration: typing.Callable[[], bool] | None,
     mapping: dict,
 ) -> tuple[pd.DataFrame, dict]:
     """
@@ -1576,7 +1541,7 @@ def default_fx_forward_model(
         total_consideration_df,
         how="outer",
         on=[t_id, t_type],
-        suffixes=[transaction_units_suffix, total_consideration_suffix],
+        suffixes=(transaction_units_suffix, total_consideration_suffix),
     )
 
     mapping_cash_txn = remap_after_merge(
@@ -1610,7 +1575,7 @@ def remap_after_merge(
     """
     new_mapping = copy.deepcopy(mapping)
     file_type = "transactions"
-    logging.info(f"updating mapping to new Total Consideration and transaction fields ")
+    logging.info("updating mapping to new Total Consideration and transaction fields ")
     # currencies and amounts coming into the portfolio i.e. buy
 
     total_consideration_fields = [
@@ -1714,23 +1679,19 @@ def update_value(d: typing.Union[dict, str], val: typing.Union[str, float]):
             err = f"Failed to update dictionary. Expected ['column', 'default'] in {d}, but found {list(d.keys())}"
             raise ValueError(err)
 
-        if type(val) != type(d["column"]):
-            warn = f"new data type is not same as original value"
-        #             logging.warning(warn)
+        if type(val) is not type(d["column"]):  # noqa: E721
+            pass  # new data type is not same as original value
         d["column"] = val
         return d
 
-    if type(val) != type(d):
-        warn = f"new data type is not same as original value"
-    #         logging.warning(warn)
+    if type(val) is not type(d):  # noqa: E721
+        pass  # new data type is not same as original value
 
     # update value provided with constant format using "$"
     if isinstance(d, str) and d[0] == "$":
         return {"default": d[1:], "column": val}
     # for any other data types, simply update the value
-    d = val
-
-    return d
+    return val
 
 
 def group_request_into_one(
@@ -1771,7 +1732,7 @@ def group_request_into_one(
             f"The length of the batch_index ({batch_index}) is greater than the request_list ({len(request_list)}) provided."
         )
 
-    if type(attribute_for_grouping) == list and len(attribute_for_grouping) == 0:
+    if isinstance(attribute_for_grouping, list) and len(attribute_for_grouping) == 0:
         raise ValueError("The provided list of attribute_for_grouping is empty.")
 
     base_request = request_list[batch_index]
@@ -1800,8 +1761,7 @@ def group_request_into_one(
 
             setattr(base_request, attrib, batch_attrib)
 
-        #elif "dict" in attrib_type:
-        elif "Mapping[" in attribs[attrib]:
+        elif "Mapping[" in attribs[attrib] or "dict(" in attribs[attrib]:
             # Collect the attributes from each request onto a dictionary
 
             batch_attrib = dict(

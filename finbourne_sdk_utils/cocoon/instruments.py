@@ -1,6 +1,8 @@
-import lusid
-import lusid.models as models
-from lusid.api import InstrumentsApi, SearchApi
+import finbourne.sdk.services.lusid as lusid
+import finbourne.sdk.services.lusid.models as models
+from finbourne.sdk.services.lusid.api import InstrumentsApi, SearchApi
+from finbourne.sdk.extensions import SyncApiClientFactory
+from finbourne.sdk.exceptions import ApiException
 import numpy as np
 import time
 from finbourne_sdk_utils.cocoon.utilities import checkargs
@@ -9,7 +11,7 @@ import logging
 import re
 from finbourne_sdk_utils.cocoon.async_tools import run_in_executor
 import asyncio
-from typing import Callable
+from typing import Any, Callable
 
 
 @checkargs
@@ -33,13 +35,13 @@ def prepare_key(identifier_lusid: str, full_key_format: bool) -> str:
     if full_key_format:
         return (
             identifier_lusid
-            if re.findall("Instrument/\S+/\S+", identifier_lusid)
+            if re.findall(r"Instrument/\S+/\S+", identifier_lusid)
             else f"Instrument/default/{identifier_lusid}"
         )
     else:
         return (
             identifier_lusid.split("/")[2]
-            if re.findall("Instrument/default/\S+", identifier_lusid)
+            if re.findall(r"Instrument/default/\S+", identifier_lusid)
             else identifier_lusid
         )
 
@@ -49,8 +51,8 @@ def create_identifiers(
     index,
     row: pd.Series,
     file_type: str,
-    instrument_identifier_mapping: dict = None,
-    unique_identifiers: list = None,
+    instrument_identifier_mapping: dict | None = None,
+    unique_identifiers: list | None = None,
     full_key_format: bool = True,
     prepare_key: Callable = prepare_key,
 ) -> dict:
@@ -64,9 +66,9 @@ def create_identifiers(
         The row of the DataFrame to create identifiers for
     file_type : str
         The file type to create identifiers for
-    instrument_identifier_mapping : dict
+    instrument_identifier_mapping : dict | None
         The instrument identifier mapping to use
-    unique_identifiers : list
+    unique_identifiers : list | None
         The list of allowable unique instrument identifiers
     full_key_format : bool
         Whether the full key format i.e. 'Instrument/default/Figi' is required
@@ -79,6 +81,9 @@ def create_identifiers(
         The identifiers to use on the request
     """
 
+    if instrument_identifier_mapping is None:
+        raise ValueError("No instrument identifier mapping provided")
+    
     # Populate the identifiers for this instrument
     identifiers = {
         # Handles specifying the entire property key e.g. Instrument/default/Figi or just the code e.g. Figi
@@ -88,9 +93,7 @@ def create_identifiers(
         if file_type == "instrument"
         else str(row[identifier_column])
         for identifier_lusid, identifier_column in instrument_identifier_mapping.items()
-        if not pd.isna(  # Only use the identifier if it has a value
-            row[identifier_column]  # type is instrument_identifiers: Dict[str, StrictStr]
-        )
+        if not bool(pd.isna(row[identifier_column]))  # Only use the identifier if it has a value
     }
 
     # If there are no identifiers raise an error
@@ -102,7 +105,8 @@ def create_identifiers(
 
     # Check that at least one unique identifier exists if it is an instrument file (need to move this out of here)
     if file_type == "instrument":
-
+        if unique_identifiers is None:
+            raise ValueError("No unique identifiers provided")
         # Get the unique list of unique identifiers which have been populated
         unique_identifiers_populated = list(
             set(unique_identifiers).intersection(set(list(identifiers.keys())))
@@ -132,7 +136,7 @@ def create_identifiers(
 
 @checkargs
 def resolve_instruments(
-    api_factory: lusid.SyncApiClientFactory,
+    api_factory: SyncApiClientFactory,
     data_frame: pd.DataFrame,
     identifier_mapping: dict,
 ):
@@ -141,7 +145,7 @@ def resolve_instruments(
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory
+    api_factory : SyncApiClientFactory
         An instance of the Lusid Api Factory
     data_frame : pd.DataFrame
         The DataFrame containing the transactions or holdings to resolve to unique instruments
@@ -200,7 +204,7 @@ def resolve_instruments(
     # Iterate over each row in the DataFrame
     for index, row in _data_frame.iterrows():
 
-        if index % 10 == 0:
+        if isinstance(index, int) and index % 10 == 0:
             logging.info(f"Up to row {index}")
         # Initialise list to hold the identifiers used to resolve
         found_with_current = []
@@ -213,7 +217,7 @@ def resolve_instruments(
         # Takes the currency resolution function and applies it
         currency = row[identifier_mapping["Instrument/default/Currency"]]
 
-        if not pd.isna(currency):
+        if not bool(pd.isna(currency)):
             resolvable_current = True
             found_with_current.append(currency)
             luid_current = currency
@@ -227,7 +231,7 @@ def resolve_instruments(
                 value=str(row[identifier_dataframe]),
             )
             for identifier_lusid, identifier_dataframe in identifier_mapping.items()
-            if not pd.isnull(row[identifier_dataframe])
+            if not bool(pd.isnull(row[identifier_dataframe]))
         ]
 
         # Call LUSID to search for instruments
@@ -236,11 +240,11 @@ def resolve_instruments(
         if len(search_requests) > 0:
             while attempts < 3:
                 try:
-                    response = api_factory.build(SearchApi).instruments_search(
+                    response: Any = api_factory.build(SearchApi).instruments_search(
                         instrument_search_property=search_requests, mastered_only=True
                     )
                     break
-                except lusid.exceptions.ApiException as error_message:
+                except ApiException as error_message:
                     attempts += 1
                     comment_current = f"Failed to find instrument due to LUSID error during search due to status {error_message.status} with reason {error_message.reason}"
                     time.sleep(5)
@@ -262,7 +266,8 @@ def resolve_instruments(
 
                 search_request_number += 1
                 # If there are matches
-                if len(result.mastered_instruments) == 1:
+                mastered = result.mastered_instruments or []
+                if len(mastered) == 1:
                     # Add the identifier responsible for the successful search request to the list
                     found_with_current.append(
                         search_requests[search_request_number].key.split("/")[2]
@@ -272,13 +277,13 @@ def resolve_instruments(
                     )
                     resolvable_current = True
                     luid_current = (
-                        result.mastered_instruments[0]
+                        mastered[0]
                         .identifiers["LusidInstrumentId"]
                         .value
                     )
                     break
 
-                elif len(result.mastered_instruments) > 1:
+                elif len(mastered) > 1:
                     comment_current = f'Multiple instruments found for the instrument using identifier {search_requests[search_request_number].key.split("/")[2]}'
                     resolvable_current = False
                     luid_current = np.nan
@@ -302,14 +307,14 @@ def resolve_instruments(
 
 
 @checkargs
-def get_unique_identifiers(api_factory: lusid.SyncApiClientFactory):
+def get_unique_identifiers(api_factory: SyncApiClientFactory):
 
     """
     Tests getting the unique instrument identifiers
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory
+    api_factory : SyncApiClientFactory
         The LUSID api factory to use
 
     Returns
@@ -319,7 +324,7 @@ def get_unique_identifiers(api_factory: lusid.SyncApiClientFactory):
     """
     # Get the allowed instrument identifiers from LUSID
     identifiers = api_factory.build(
-        lusid.api.InstrumentsApi
+        InstrumentsApi
     ).get_instrument_identifier_types()
 
     # Return the identifiers that are configured to be unique
@@ -331,7 +336,7 @@ def get_unique_identifiers(api_factory: lusid.SyncApiClientFactory):
 
 
 async def enrich_instruments(
-    api_factory: lusid.SyncApiClientFactory,
+    api_factory: SyncApiClientFactory,
     data_frame: pd.DataFrame,
     instrument_identifier_mapping: dict,
     mapping_required: dict,
@@ -342,14 +347,14 @@ async def enrich_instruments(
 
     for index, row in data_frame.iterrows():
         search_requests_instrument = [
-            lusid.models.InstrumentSearchProperty(
+            lusid.InstrumentSearchProperty(
                 key=identifier_lusid
-                if re.findall("Instrument/default/\S+", identifier_lusid)
+                if re.findall(r"Instrument/default/\S+", identifier_lusid)
                 else f"Instrument/default/{identifier_lusid}",
-                value=row[identifier_column],
+                value=str(row[identifier_column]),
             )
             for identifier_lusid, identifier_column in instrument_identifier_mapping.items()
-            if not pd.isna(row[identifier_column])
+            if not bool(pd.isna(row[identifier_column]))
         ]
 
         search_requests_all.append(search_requests_instrument)
@@ -421,16 +426,16 @@ async def enrich_instruments(
 
 
 async def instrument_search(
-    api_factory: lusid.SyncApiClientFactory, search_requests: list, **kwargs
+    api_factory: SyncApiClientFactory, search_requests: list, **kwargs
 ) -> list:
     """
     Conducts an instrument search for a single instrument
 
     Parameters
     ----------
-    api_factory :       lusid.SyncApiClientFactory
+    api_factory :       SyncApiClientFactory
                         The api factory to use
-    search_requests:    list[lusid.models.InstrumentSearchProperty]
+    search_requests:    list[lusid.InstrumentSearchProperty]
                         The search requests for this instrument
     kwargs
 
@@ -444,19 +449,19 @@ async def instrument_search(
 
     for search_request in search_requests:
         try:
-            result = await instrument_search_single(
+            result = await instrument_search_single(  # type: ignore[misc]
                 api_factory, search_request, **kwargs
             )
             instrument_search_results.append(result)
-        except lusid.exceptions.ApiException as e:
+        except ApiException as e:
             instrument_search_results.append(e)
     return instrument_search_results
 
 
 @run_in_executor
 def instrument_search_single(
-    api_factory: lusid.SyncApiClientFactory,
-    search_request: lusid.models.InstrumentSearchProperty,
+    api_factory: SyncApiClientFactory,
+    search_request: lusid.InstrumentSearchProperty,
     **kwargs,
 ) -> list:
     """
@@ -464,19 +469,19 @@ def instrument_search_single(
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory
+    api_factory : SyncApiClientFactory
         The Api factory to use
-    search_request : lusid.models.InstrumentSearchProperty
+    search_request : lusid.InstrumentSearchProperty
         The search request
     kwargs
 
     Returns
     -------
-    list[lusid.models.InstrumentMatch]
+    list[lusid.InstrumentMatch]
         The results of the search
     """
     
-    api_instance = api_factory.build(lusid.api.SearchApi)
+    api_instance = api_factory.build(SearchApi)
     
     return api_instance.instruments_search(instrument_search_property=[search_request])
                                      

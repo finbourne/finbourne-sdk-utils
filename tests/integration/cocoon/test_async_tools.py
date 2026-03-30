@@ -1,64 +1,60 @@
 import os
-import unittest
 from pathlib import Path
+from typing import ClassVar
 import pandas as pd
 
-from finbourne_sdk_utils import cocoon as cocoon
-from parameterized import parameterized
-import lusid
-from finbourne_sdk_utils import logger
 import numpy as np
 import concurrent.futures
+import pytest
+
+from finbourne_sdk_utils import cocoon as cocoon
+import finbourne.sdk.services.lusid as lusid
+from finbourne.sdk.extensions.api_client_factory import SyncApiClientFactory
+from finbourne_sdk_utils import logger
 
 
-class CocoonTestsAsyncTools(unittest.TestCase):
+class TestAsyncTools:
     """"
     These tests are to ensure that the Asynchronous Tools work as expected.
     """
 
+    api_factory: ClassVar[SyncApiClientFactory]
+
     @classmethod
-    def setUpClass(cls) -> None:
-        secrets_file = Path(__file__).parent.parent.parent.joinpath("secrets.json")
-        cls.api_factory = lusid.SyncApiClientFactory( )
-        
+    def setup_class(cls) -> None:
+        cls.api_factory = SyncApiClientFactory()
         cls.logger = logger.LusidLogger(os.getenv("FBN_LOG_LEVEL", "info"))
 
-    @parameterized.expand(
+    @pytest.mark.skip
+    @pytest.mark.parametrize(
+        "file_name, number_threads, thread_pool_max_workers",
         [
-            [
-                "Standard load with ~700 portfolios in 1 batch with max_threads per batch of 5",
+            (
                 "data/holdings-example-large.csv",
                 1,
                 5,
-            ],
-            [
-                "Standard load with ~700 portfolios in 5 batches with max_threads per batch of 5",
+            ),
+            (
                 "data/holdings-example-large.csv",
                 5,
                 5,
-            ],
-            [
-                "Standard load with ~700 portfolios in 5 batches with max_threads per batch of 10",
+            ),
+            (
                 "data/holdings-example-large.csv",
                 5,
                 10,
-            ],
-        ]
+            ),
+        ],
+        ids=[
+            "Standard load with ~700 portfolios in 1 batch with max_threads per batch of 5",
+            "Standard load with ~700 portfolios in 5 batches with max_threads per batch of 5",
+            "Standard load with ~700 portfolios in 5 batches with max_threads per batch of 10",
+        ],
     )
-    @unittest.skip
-    def test_multiple_threads(
-        self, _, file_name, number_threads, thread_pool_max_workers
-    ):
+    def test_multiple_threads(self, file_name, number_threads, thread_pool_max_workers):
         """
         This tests different combinations of running load_from_data_frame across multiple threads and configuring
         the max number of workers that each call to load_from_data_frame will use in its thread pool.
-
-        :param str _: The name of the test
-        :param str file_name: The name of the test data file working with holdings
-        :param int number_threads: The number of threads to split the file load across (the number of times load_from_data_frame is called)
-        :param int thread_pool_max_workers: The maximum number of workers per thread pool for each call to load_from_data_frame
-
-        :return: None
         """
 
         mapping_required = {
@@ -123,21 +119,14 @@ class CocoonTestsAsyncTools(unittest.TestCase):
         responses = [future.result() for future in futures]
 
         # Check that the results are as expected
-        self.assertGreater(
-            sum([len(response["holdings"]["success"]) for response in responses]), 0
+        assert sum([len(response["holdings"]["success"]) for response in responses]) > 0
+        assert sum([len(response["holdings"]["success"]) for response in responses]) == len(
+            data_frame
         )
-        self.assertEqual(
-            sum([len(response["holdings"]["success"]) for response in responses]),
-            len(data_frame),
-        )
-        self.assertEqual(
-            sum([len(response["holdings"]["errors"]) for response in responses]), 0
-        )
+        assert sum([len(response["holdings"]["errors"]) for response in responses]) == 0
 
-        self.assertTrue(
-            expr=all(
-                isinstance(succcess_response.version, lusid.models.Version)
-                for response in responses
-                for succcess_response in response["holdings"]["success"]
-            )
+        assert all(
+            isinstance(success_response.version, lusid.Version)
+            for response in responses
+            for success_response in response["holdings"]["success"]
         )

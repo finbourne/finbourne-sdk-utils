@@ -73,20 +73,20 @@ def _process_date_as_string(datetime_value: str):
 
     """
     # Cut label regular expression, no modification required
-    if re.findall("\d{4}-\d{2}-\d{2}N\w+", datetime_value):
+    if re.findall(r"\d{4}-\d{2}-\d{2}N\w+", datetime_value):
         pass
 
     # Already in isoformat and UTC timezone
     elif re.findall(
-        "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", datetime_value
-    ) or re.findall("\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d+Z", datetime_value):
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", datetime_value
+    ) or re.findall(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d+Z", datetime_value):
         pass
 
     # Already in isoformat but not necessarily UTC timezone
     elif re.findall(
-        "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[\+-]\d{2}:\d+", datetime_value
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[\+-]\d{2}:\d+", datetime_value
     ) or re.findall(
-        "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d+[\+-]\d{2}:\d{2}", datetime_value
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d+[\+-]\d{2}:\d{2}", datetime_value
     ):
         # Convert to UTC
         datetime_value = (
@@ -94,9 +94,9 @@ def _process_date_as_string(datetime_value: str):
         )
 
     # ISO format with no timezone
-    elif re.findall("\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", datetime_value):
+    elif re.findall(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", datetime_value):
         datetime_value = datetime_value + "+00:00"
-    elif re.findall("\d{4}-\d{2}-\d{2}", datetime_value):
+    elif re.findall(r"\d{4}-\d{2}-\d{2}", datetime_value):
         datetime_value = datetime_value + "T00:00:00+00:00"
     else:
         datetime_value = _process_datetime(

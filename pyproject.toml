@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=45"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finbourne-sdk-utils"
+version = "1.0.17"
+description = "Python utilities for LUSID V3 SDK"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "FINBOURNE Technology", email = "engineering@finbourne.com" }]
+keywords = ["FINBOURNE", "LUSID", "LUSID SDK", "python"]
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.27.1",
+    "coloredlogs>=14.0",
+    "detect_delimiter>=0.1",
+    "flatten-json>=0.1.7",
+    "pandas>=1.1.4,<=2.3.3",
+    "numpy==2.4.3",
+    "pytz>=2019.3",
+    "ipython==8.32",
+    "finbourne-sdk>=0.0.3",
+    "openpyxl>=3.1.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/finbourne/finbourne-sdk-utils"
+
+[tool.setuptools.packages.find]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.json"]
+
+[tool.uv.sources]
+
+[tool.pyright]
+pythonVersion = "3.13"
+useLibraryCodeForTypes = true
+enableExperimentalFeatures = true
+reportCallIssue = "none"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.7",
+    "pytest==9.0.2",
+    "pyright>=1.1.408"
+]

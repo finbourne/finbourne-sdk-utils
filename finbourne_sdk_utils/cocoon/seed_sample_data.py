@@ -13,7 +13,7 @@ def seed_data(
     api_factory,
     domains,
     scope: str,
-    transaction_file: str,
+    transaction_file: str | Path | pd.DataFrame,
     file_type: str,
     mappings: dict = default_mappings,
     sub_holding_keys=[],
@@ -46,7 +46,7 @@ def seed_data(
 
     """
 
-    if file_type == "DataFrame" and type(transaction_file) == pd.DataFrame:
+    if file_type == "DataFrame" and isinstance(transaction_file, pd.DataFrame):
         data_frame = transaction_file
 
     else:
@@ -55,7 +55,7 @@ def seed_data(
 
         supported_files = {"csv": "csv", "xlsx": "excel"}
 
-        if Path(transaction_file).suffix != "." + file_type.lower():
+        if Path(str(transaction_file)).suffix != "." + file_type.lower():
             raise ValueError(
                 f"""Inconsistent file and file extensions passed: {str(transaction_file)} does not have file extension {file_type}"""
             )

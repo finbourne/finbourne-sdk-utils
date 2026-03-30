@@ -1,13 +1,12 @@
 import logging
 import os
-import unittest
 from finbourne_sdk_utils import logger
 from datetime import datetime
-from parameterized import parameterized
+import pytest
 import pytz
 
 from finbourne_sdk_utils.extract.group_holdings import _join_holdings
-from lusid.models import (
+from finbourne.sdk.services.lusid.models import (
     PortfolioHolding,
     ModelProperty,
     PropertyValue,
@@ -17,9 +16,9 @@ from lusid.models import (
 now = datetime.now(pytz.UTC)
 
 
-class CocoonExtractGroupHoldingsTests(unittest.TestCase):
+class TestCocoonExtractGroupHoldings:
     @classmethod
-    def setUpClass(cls) -> None:
+    def setup_class(cls) -> None:
         cls.logger = logger.LusidLogger(os.getenv("FBN_LOG_LEVEL", "info"))
 
     class PortfolioHoldingTemplate(PortfolioHolding):
@@ -47,10 +46,10 @@ class CocoonExtractGroupHoldingsTests(unittest.TestCase):
 
             super().__init__(**init_kwargs)
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "holdings_to_join, group_by_portfolio, dict_key, expected_outcome",
         [
-            [
-                "Standard joining preserving portfolio separation",
+            (
                 {
                     "MyScope : PortfolioA": [PortfolioHoldingTemplate()],
                     "MyScope : PortfolioB": [PortfolioHoldingTemplate()],
@@ -61,9 +60,8 @@ class CocoonExtractGroupHoldingsTests(unittest.TestCase):
                     "MyScope : PortfolioA": [PortfolioHoldingTemplate()],
                     "MyScope : PortfolioB": [PortfolioHoldingTemplate()],
                 },
-            ],
-            [
-                "Standard joining with no portfolio separation",
+            ),
+            (
                 {
                     "MyScope : PortfolioA": [PortfolioHoldingTemplate()],
                     "MyScope : PortfolioB": [PortfolioHoldingTemplate()],
@@ -82,9 +80,8 @@ class CocoonExtractGroupHoldingsTests(unittest.TestCase):
                         )
                     ]
                 },
-            ],
-            [
-                "Standard joining with no portfolio separation with Instrument property",
+            ),
+            (
                 {
                     "MyScope : PortfolioA": [
                         PortfolioHoldingTemplate(
@@ -119,9 +116,8 @@ class CocoonExtractGroupHoldingsTests(unittest.TestCase):
                         )
                     ]
                 },
-            ],
-            [
-                "All merged with same instrument in different currencies",
+            ),
+            (
                 {
                     "MyScope : PortfolioA": [
                         PortfolioHoldingTemplate(
@@ -143,9 +139,8 @@ class CocoonExtractGroupHoldingsTests(unittest.TestCase):
                         PortfolioHoldingTemplate(**{"properties": {}}),
                     ]
                 },
-            ],
-            [
-                "2x Instrument A, 1x Instrument B",
+            ),
+            (
                 {
                     "MyScope : PortfolioA": [
                         PortfolioHoldingTemplate(
@@ -179,11 +174,11 @@ class CocoonExtractGroupHoldingsTests(unittest.TestCase):
                         ),
                     ]
                 },
-            ],
+            ),
         ]
     )
     def test_join_holdings(
-        self, _, holdings_to_join, group_by_portfolio, dict_key, expected_outcome
+        self, holdings_to_join, group_by_portfolio, dict_key, expected_outcome
     ):
 
         joined_holdings = _join_holdings(
@@ -195,4 +190,6 @@ class CocoonExtractGroupHoldingsTests(unittest.TestCase):
         logging.info(joined_holdings)
         logging.info(expected_outcome)
 
-        self.assertEqual(joined_holdings, expected_outcome)
+        actual_dumps = {k: [h.model_dump() for h in v] for k, v in joined_holdings.items()}
+        expected_dumps = {k: [h.model_dump() for h in v] for k, v in expected_outcome.items()}
+        assert actual_dumps == expected_dumps

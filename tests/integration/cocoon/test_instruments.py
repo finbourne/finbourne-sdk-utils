@@ -1,28 +1,27 @@
 import os
-import unittest
+import pytest
 from pathlib import Path
 import pandas as pd
-import lusid
+from finbourne.sdk.extensions import SyncApiClientFactory
 
 from finbourne_sdk_utils import cocoon as cocoon
-from parameterized import parameterized
 from finbourne_sdk_utils import logger
 import asyncio
 
 
-class CocoonInstrumentsTests(unittest.TestCase):
-    api_factory = None
+class TestCocoonInstruments:
+    api_factory: SyncApiClientFactory
 
     @classmethod
-    def setUpClass(cls) -> None:
+    def setup_class(cls) -> None:
 
-        cls.api_factory = lusid.SyncApiClientFactory()
-        
+        cls.api_factory = SyncApiClientFactory()
+
         cls.logger = logger.LusidLogger(os.getenv("FBN_LOG_LEVEL", "info"))
         cls.loop = cocoon.async_tools.start_event_loop_new_thread()
 
     @classmethod
-    def tearDownClass(cls) -> None:
+    def teardown_class(cls) -> None:
         cls.loop.stop()
 
     def test_resolve_valid_instruments(self):
@@ -46,7 +45,7 @@ class CocoonInstrumentsTests(unittest.TestCase):
 
         df = pd.DataFrame(data)
         df_expected_value = pd.DataFrame(data_expected_value)
-        upsert_response = cocoon.cocoon.load_from_data_frame(
+        cocoon.cocoon.load_from_data_frame(
             api_factory=self.api_factory,
             mapping_required=required_mapping_expected_value,
             mapping_optional={},
@@ -62,7 +61,7 @@ class CocoonInstrumentsTests(unittest.TestCase):
         result.set_index("ids", inplace=True)
 
         def validate_luid(luid):
-            self.assertTrue(luid.startswith("LUID_"), f"unexpected LUID value: {luid}")
+            assert luid.startswith("LUID_"), f"unexpected LUID value: {luid}"
 
         for i in source_ids:
             validate_luid(result.loc[i]["LusidInstrumentId"])
@@ -79,24 +78,22 @@ class CocoonInstrumentsTests(unittest.TestCase):
             self.api_factory, data_frame=df, identifier_mapping=identifier_mapping
         )
 
-        self.assertFalse(result.iloc[0]["LusidInstrumentId"])
+        assert not result.iloc[0]["LusidInstrumentId"]
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "expected_outcome",
         [
             [
-                "Standard Out of Box Identifiers",
-                [
-                    "Figi",
-                    "ClientInternal",
-                    "QuotePermId",
-                    "LusidInstrumentId",
-                    "Currency",
-                ],
-            ]
-        ]
+                "Figi",
+                "ClientInternal",
+                "QuotePermId",
+                "LusidInstrumentId",
+                "Currency",
+            ],
+        ],
     )
-    @unittest.skip("Currency holdings return a message instead of LUID-XXXXXX")
-    def test_get_unique_identifiers(self, _, expected_outcome) -> None:
+    @pytest.mark.skip("Currency holdings return a message instead of LUID-XXXXXX")
+    def test_get_unique_identifiers(self, expected_outcome) -> None:
         """
         Tests that the unique identifers are correctly retrieved
 
@@ -108,39 +105,36 @@ class CocoonInstrumentsTests(unittest.TestCase):
         unique_identifiers.sort()
         expected_outcome.sort()
 
-        self.assertListEqual(unique_identifiers, expected_outcome)
+        assert unique_identifiers == expected_outcome
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "file_name, mapping_required, instrument_identifier_mapping",
         [
-            [
-                "A standard successful load of instruments",
+            (
                 "data/global-fund-combined-instrument-master-missing-name.csv",
                 {"name": "instrument_name"},
                 {"Figi": "figi", "Isin": "isin", "ClientInternal": "client_internal"},
-            ],
-            [
-                "Constant prefix",
+            ),
+            (
                 "data/global-fund-combined-instrument-master-missing-name.csv",
                 {"name": "$Unknown"},
                 {"Figi": "figi", "Isin": "isin", "ClientInternal": "client_internal"},
-            ],
-            [
-                "Default specified",
+            ),
+            (
                 "data/global-fund-combined-instrument-master-missing-name.csv",
                 {"name": {"default": "$Unknown"}},
                 {"Figi": "figi", "Isin": "isin", "ClientInternal": "client_internal"},
-            ],
-            [
-                "Default specified with column name",
+            ),
+            (
                 "data/global-fund-combined-instrument-master-missing-name.csv",
                 {"name": {"default": "$Unknown", "column": "instrument_name"}},
                 {"Figi": "figi", "Isin": "isin", "ClientInternal": "client_internal"},
-            ],
-        ]
+            ),
+        ],
     )
-    @unittest.skip
+    @pytest.mark.skip("Open Figi isn't supported at the moment")
     def test_enrich_instruments(
-        self, _, file_name, mapping_required, instrument_identifier_mapping
+        self, file_name, mapping_required, instrument_identifier_mapping
     ):
 
         data_frame = pd.read_csv(Path(__file__).parent.joinpath(file_name))

@@ -1,8 +1,10 @@
-from typing import List
+from typing import cast
 
 from finbourne_sdk_utils.cocoon.utilities import checkargs
 from finbourne_sdk_utils import cocoon
-import lusid
+import finbourne.sdk.services.lusid as lusid
+from finbourne.sdk.extensions import SyncApiClientFactory
+from finbourne.sdk.exceptions import ApiException
 import pandas as pd
 import logging
 from http import HTTPStatus
@@ -22,14 +24,14 @@ global_constants = {
 
 @checkargs
 def check_property_definitions_exist_in_scope_single(
-    api_factory: lusid.SyncApiClientFactory, property_key: str
-) -> tuple[bool, str]:
+    api_factory: SyncApiClientFactory, property_key: str
+) -> tuple[bool, str | None]:
     """
     This function takes a list of property keys and looks to see which property definitions already exist inside LUSID
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory
+    api_factory : SyncApiClientFactory
         The ApiFactory to use
     property_key: str
         The property key to get from LUSID
@@ -54,9 +56,9 @@ def check_property_definitions_exist_in_scope_single(
         )
 
         exists = True
-        data_type = response.data_type_id.code
+        data_type = response.data_type_id.code if response.data_type_id else None
 
-    except lusid.exceptions.ApiException as ex:
+    except ApiException as ex:
         if ex.status == HTTPStatus.NOT_FOUND:
             exists = False
         else:
@@ -67,7 +69,7 @@ def check_property_definitions_exist_in_scope_single(
 
 @checkargs
 def check_property_definitions_exist_in_scope(
-    api_factory: lusid.SyncApiClientFactory,
+    api_factory: SyncApiClientFactory,
     domain: str,
     data_frame: pd.DataFrame,
     target_columns: list,
@@ -78,7 +80,7 @@ def check_property_definitions_exist_in_scope(
 
     Parameters
     ----------
-    api_factory :   lusid.SyncApiClientFactory
+    api_factory :   SyncApiClientFactory
         The Api Factory to use
     domain : str
         The domain to check for property definitions in
@@ -148,7 +150,7 @@ def check_property_definitions_exist_in_scope(
 
 @checkargs
 def create_property_definitions_from_file(
-    api_factory: lusid.SyncApiClientFactory,
+    api_factory: SyncApiClientFactory,
     domain: str,
     data_frame: pd.DataFrame,
     missing_property_columns: list,
@@ -159,7 +161,7 @@ def create_property_definitions_from_file(
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory
+    api_factory : SyncApiClientFactory
         The ApiFactory to use
     domain : domain
         The domain to create the property definitions in
@@ -249,13 +251,13 @@ def create_property_definitions_from_file(
                     data_type = 'object'
 
         # Create a request to define the property, assumes value_required is false for all
-        property_request = lusid.models.CreatePropertyDefinitionRequest(
+        property_request = lusid.CreatePropertyDefinitionRequest(
             domain=domain,
             scope=column_to_scope[column_name],
             code=lusid_friendly_code,
             value_required=False,
             display_name=column_name,
-            data_type_id=lusid.models.ResourceId(
+            data_type_id=lusid.ResourceId(
                 scope="system",
                 code=global_constants["data_type_mapping"][str(data_type)],
             ),
@@ -269,7 +271,7 @@ def create_property_definitions_from_file(
         )
 
         logging.info(
-            f"Created - {property_response.key} - with datatype {property_response.data_type_id.code}"
+            f"Created - {property_response.key} - with datatype {property_response.data_type_id.code if property_response.data_type_id else None}"
         )
 
         # Grab the key off the response to use when referencing this property in other LUSID calls
@@ -280,7 +282,7 @@ def create_property_definitions_from_file(
 
 @checkargs
 def create_missing_property_definitions_from_file(
-    api_factory: lusid.SyncApiClientFactory,
+    api_factory: SyncApiClientFactory,
     properties_scope: str,
     data_frame: pd.DataFrame,
     property_columns: list,
@@ -357,7 +359,7 @@ def invalid_columns_error_message(unmapped_columns, allowed_data_types):
 @checkargs
 def create_property_values(
     row: pd.Series, column_to_scope: dict, scope: str, domain: str, dtypes: pd.Series
-) -> dict:
+) -> dict | list:
     """
     This function generates the property values for a row in a file
 
@@ -404,24 +406,36 @@ def create_property_values(
         row_value = row[column_name]
 
         # Use the correct LUSID property value based on the data type
+        property_value: lusid.PropertyValue | None = None
         if lusid_data_type == "string":
-            if pd.isna(row_value):
+            if cast(bool, pd.isna(row_value)):
                 continue
-            property_value = lusid.models.PropertyValue(label_value=str(row_value))  
+            property_value = lusid.PropertyValue(label_value=str(row_value))
 
-        if lusid_data_type == "number":
+        elif lusid_data_type == "number":
             # Handle null values given the input null value override
-            if pd.isnull(row_value):
+            if cast(bool, pd.isnull(row_value)):
                 continue
-            property_value = lusid.models.PropertyValue(
-                metric_value=lusid.models.MetricValue(value=row_value)
+            property_value = lusid.PropertyValue(
+                metric_value=lusid.MetricValue(value=float(row_value))
             )
+
+        if property_value is None:
+            continue
 
         # Set the property
         property_key = f"{domain}/{column_to_scope.get(column_name, scope)}/{cocoon.utilities.make_code_lusid_friendly(column_name)}"
-        properties[property_key] = lusid.models.PerpetualProperty(
-            key=property_key, value=property_value
-        )
+
+        # Instrument, Portfolio, and PortfolioGroup models expect ModelProperty;
+        # Transaction and Holding models expect PerpetualProperty.
+        if domain.lower() in ("instrument", "portfolio", "portfoliogroup"):
+            properties[property_key] = lusid.ModelProperty(
+                key=property_key, value=property_value
+            )
+        else:
+            properties[property_key] = lusid.PerpetualProperty(
+                key=property_key, value=property_value
+            )
 
     if domain.lower() == "instrument":
         properties = list(properties.values())

@@ -1,5 +1,3 @@
-import datetime
-from dateutil.tz import tzutc
 
 
 def gen_transaction_data(txn_count, txn_date):

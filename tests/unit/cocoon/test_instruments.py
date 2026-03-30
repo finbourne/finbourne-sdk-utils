@@ -1,47 +1,26 @@
-import logging
 import os
-import unittest
 from finbourne_sdk_utils import logger
 from finbourne_sdk_utils.cocoon.instruments import prepare_key
-from parameterized import parameterized
+import pytest
 
 
-class CocoonUtilitiesTests(unittest.TestCase):
+class TestCocoonInstruments:
     @classmethod
-    def setUpClass(cls) -> None:
+    def setup_class(cls) -> None:
         cls.logger = logger.LusidLogger(os.getenv("FBN_LOG_LEVEL", "info"))
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "identifier_lusid, full_key_format, expected_outcome",
         [
-            [
-                "Standard full key",
-                "Instrument/default/Figi",
-                True,
-                "Instrument/default/Figi",
-            ],
-            [
-                "Full key specified as short key",
-                "Figi",
-                True,
-                "Instrument/default/Figi",
-            ],
-            [
-                "Full key specified as property",
-                "Instrument/PB/Isin",
-                True,
-                "Instrument/PB/Isin",
-            ],
-            ["Standard short key", "Isin", False, "Isin"],
-            [
-                "Short key specifed as long key",
-                "Instrument/default/Isin",
-                False,
-                "Isin",
-            ],
-        ]
+            ("Instrument/default/Figi", True, "Instrument/default/Figi"),
+            ("Figi", True, "Instrument/default/Figi"),
+            ("Instrument/PB/Isin", True, "Instrument/PB/Isin"),
+            ("Isin", False, "Isin"),
+            ("Instrument/default/Isin", False, "Isin"),
+        ],
     )
     def test_create_identifiers_prepare_key(
-        self, _, identifier_lusid, full_key_format, expected_outcome
+        self, identifier_lusid, full_key_format, expected_outcome
     ) -> None:
         """
         Tests that key preparation for identifiers works as expected
@@ -58,4 +37,4 @@ class CocoonUtilitiesTests(unittest.TestCase):
             identifier_lusid=identifier_lusid, full_key_format=full_key_format
         )
 
-        self.assertEqual(output_key, expected_outcome)
+        assert output_key == expected_outcome

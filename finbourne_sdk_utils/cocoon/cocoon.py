@@ -1,12 +1,14 @@
 import asyncio
-import concurrent
 import uuid
 
-import lusid
+import finbourne.sdk.services.lusid as lusid
+import finbourne.sdk.services.lusid.models as lusid_models
+from finbourne.sdk.exceptions import ApiException
+from finbourne.sdk.extensions import SyncApiClientFactory
 import pandas as pd
 import json
 
-from typing import List, Tuple
+from typing import Any, List, Tuple, cast
 
 from finbourne_sdk_utils import cocoon
 from finbourne_sdk_utils.cocoon.async_tools import run_in_executor, ThreadPool
@@ -34,23 +36,23 @@ class BatchLoader:
     @staticmethod
     @run_in_executor
     def load_instrument_batch(
-            api_factory: lusid.SyncApiClientFactory, instrument_batch: list, **kwargs
-    ) -> lusid.models.UpsertInstrumentsResponse:
+            api_factory: SyncApiClientFactory, instrument_batch: list, **kwargs
+    ) -> lusid.UpsertInstrumentsResponse:
         """
         Upserts a batch of instruments to LUSID
 
         Parameters
         ----------
-        api_factory : lusid.SyncApiClientFactory
+        api_factory : SyncApiClientFactory
             The api factory to use
-        instrument_batch : list[lusid.models.InstrumentDefinition]
+        instrument_batch : list[lusid.InstrumentDefinition]
             The batch of instruments to upsert
         **kwargs
             arguments specific to each call e.g. effective_at for holdings, unique_identifiers
 
         Returns
         -------
-        lusid.models.UpsertInstrumentsResponse
+        lusid.UpsertInstrumentsResponse
             The response from LUSID
         """
 
@@ -64,7 +66,7 @@ class BatchLoader:
 
         @checkargs
         def get_alphabetically_first_identifier_key(
-                instrument: lusid.models.InstrumentDefinition, unique_identifiers: list
+                instrument: lusid.InstrumentDefinition, unique_identifiers: list
         ):
             """
             Gets the alphabetically first occurring unique identifier on an instrument and use it as the correlation
@@ -72,7 +74,7 @@ class BatchLoader:
 
             Parameters
             ----------
-            instrument : lusid.models.InstrumentDefinition
+            instrument : lusid.InstrumentDefinition
                 The instrument to create a correlation id for
             unique_identifiers : list[str] unique_identifiers
                 The list of allowed unique identifiers
@@ -93,7 +95,7 @@ class BatchLoader:
             return f"{first_unique_identifier_alphabetically}: {instrument.identifiers[first_unique_identifier_alphabetically].value}"
 
         # If scope is not defined set to default scope
-        return api_factory.build(lusid.api.InstrumentsApi).upsert_instruments(
+        return api_factory.build(lusid.InstrumentsApi).upsert_instruments(
             scope=kwargs["instrument_scope"],
             request_body={
                 get_alphabetically_first_identifier_key(
@@ -106,23 +108,23 @@ class BatchLoader:
     @staticmethod
     @run_in_executor
     def load_quote_batch(
-            api_factory: lusid.SyncApiClientFactory, quote_batch: list, **kwargs
-    ) -> lusid.models.UpsertQuotesResponse:
+            api_factory: SyncApiClientFactory, quote_batch: list, **kwargs
+    ) -> lusid.UpsertQuotesResponse:
         """
         Upserts a batch of quotes into LUSID
 
         Parameters
         ----------
-        api_factory : lusid.SyncApiClientFactory
+        api_factory : SyncApiClientFactory
             The api factory to use
-        quote_batch : list[lusid.models.UpsertQuoteRequest]
+        quote_batch : list[lusid.UpsertQuoteRequest]
             The batch of quotes to upsert
         kwargs
             scope
 
         Returns
         -------
-        lusid.models.UpsertQuotesResponse
+        lusid.UpsertQuotesResponse
             The response from LUSID
 
         """
@@ -132,7 +134,7 @@ class BatchLoader:
                 "You are trying to load quotes without a scope, please ensure that a scope is provided."
             )
 
-        return api_factory.build(lusid.api.QuotesApi).upsert_quotes(
+        return api_factory.build(lusid.QuotesApi).upsert_quotes(
             scope=kwargs["scope"],
             request_body={
                 "_".join(
@@ -149,25 +151,25 @@ class BatchLoader:
     @staticmethod
     @run_in_executor
     def load_transaction_batch(
-            api_factory: lusid.SyncApiClientFactory, transaction_batch: list, **kwargs
-    ) -> lusid.models.UpsertPortfolioTransactionsResponse:
+            api_factory: SyncApiClientFactory, transaction_batch: list, **kwargs
+    ) -> lusid.UpsertPortfolioTransactionsResponse:
         """
         Upserts a batch of transactions into LUSID
 
         Parameters
         ----------
-        api_factory : lusid.SyncApiClientFactory
+        api_factory : SyncApiClientFactory
             The api factory to use
         code : str
             The code of the TransactionPortfolio to upsert the transactions into
-        transaction_batch : list[lusid.models.TransactionRequest]
+        transaction_batch : list[lusid.TransactionRequest]
             The batch of transactions to upsert
         kwargs
             code -The code of the TransactionPortfolio to upsert the transactions into
 
         Returns
         -------
-        lusid.models.UpsertPortfolioTransactionsResponse
+        lusid.UpsertPortfolioTransactionsResponse
             The response from LUSID
         """
 
@@ -182,7 +184,7 @@ class BatchLoader:
             )
 
         return api_factory.build(
-            lusid.api.TransactionPortfoliosApi
+            lusid.TransactionPortfoliosApi
         ).upsert_transactions(
             scope=kwargs["scope"],
             code=kwargs["code"],
@@ -192,18 +194,18 @@ class BatchLoader:
     @staticmethod
     @run_in_executor
     def load_transactions_with_commit_mode_batch(
-            api_factory: lusid.SyncApiClientFactory, transaction_batch: List, **kwargs
-    ) -> lusid.models.UpsertPortfolioTransactionsResponse:
+            api_factory: SyncApiClientFactory, transaction_batch: List, **kwargs
+    ) -> lusid.BatchUpsertPortfolioTransactionsResponse:
         """
         Upserts a batch of transactions into LUSID with specified type of upsert.
 
         Parameters
         ----------
-        api_factory : lusid.SyncApiClientFactory
+        api_factory : SyncApiClientFactory
             The api factory to use
         code : str
             The code of the TransactionPortfolio to upsert the transactions into
-        transaction_batch : List[lusid.models.TransactionRequest]
+        transaction_batch : List[lusid.TransactionRequest]
             The batch of transactions to upsert
         kwargs
             code -The code of the TransactionPortfolio to upsert the transactions into
@@ -211,7 +213,7 @@ class BatchLoader:
 
         Returns
         -------
-        lusid.models.BatchUpsertPortfolioTransactionsResponse
+        lusid.BatchUpsertPortfolioTransactionsResponse
             The response from LUSID
         """
 
@@ -242,7 +244,7 @@ class BatchLoader:
 
 
         return api_factory.build(
-            lusid.api.TransactionPortfoliosApi
+            lusid.TransactionPortfoliosApi
         ).batch_upsert_transactions(
             scope=kwargs["scope"],
             code=kwargs["code"],
@@ -253,16 +255,16 @@ class BatchLoader:
     @staticmethod
     @run_in_executor
     def load_holding_batch(
-            api_factory: lusid.SyncApiClientFactory, holding_batch: list, **kwargs
-    ) -> lusid.models.HoldingsAdjustment:
+            api_factory: SyncApiClientFactory, holding_batch: list, **kwargs
+    ) -> lusid.AdjustHolding:
         """
         Upserts a batch of holdings into LUSID
 
         Parameters
         ----------
-        api_factory : lusid.SyncApiClientFactory
+        api_factory : SyncApiClientFactory
             The api factory to use
-        holding_batch : list[lusid.models.AdjustHoldingRequest]
+        holding_batch : list[lusid.AdjustHoldingRequest]
             The batch of holdings
         scope : str
             The scope to upsert holdings into
@@ -274,7 +276,7 @@ class BatchLoader:
 
         Returns
         -------
-        lusid.models.HoldingsAdjustment
+        lusid.AdjustHolding
             The response from LUSID
 
         """
@@ -300,7 +302,7 @@ class BatchLoader:
                 and kwargs["holdings_adjustment_only"]
         ):
             return api_factory.build(
-                lusid.api.TransactionPortfoliosApi
+                lusid.TransactionPortfoliosApi
             ).adjust_holdings(
                 scope=kwargs["scope"],
                 code=kwargs["code"],
@@ -308,7 +310,7 @@ class BatchLoader:
                 adjust_holding_request=holding_batch,
             )
 
-        return api_factory.build(lusid.api.TransactionPortfoliosApi).set_holdings(
+        return api_factory.build(lusid.TransactionPortfoliosApi).set_holdings(
             scope=kwargs["scope"],
             code=kwargs["code"],
             effective_at=str(DateOrCutLabel(kwargs["effective_at"])),
@@ -318,16 +320,16 @@ class BatchLoader:
     @staticmethod
     @run_in_executor
     def load_portfolio_batch(
-            api_factory: lusid.SyncApiClientFactory, portfolio_batch: list, **kwargs
-    ) -> lusid.models.Portfolio:
+            api_factory: SyncApiClientFactory, portfolio_batch: list, **kwargs
+    ) -> lusid.Portfolio:
         """
         Upserts a batch of portfolios to LUSID
 
         Parameters
         ----------
-        api_factory : lusid.SyncApiClientFactory
+        api_factory : SyncApiClientFactory
             the api factory to use
-        portfolio_batch : list[lusid.models.CreateTransactionPortfolioRequest]
+        portfolio_batch : list[lusid.CreateTransactionPortfolioRequest]
             The batch of portfolios to create
         scope : str
             The scope to create the portfolios in
@@ -337,7 +339,7 @@ class BatchLoader:
 
         Returns
         -------
-        lusid.models.Portfolio
+        lusid.Portfolio
             the response from LUSID
         """
 
@@ -352,36 +354,36 @@ class BatchLoader:
             )
 
         try:
-            return api_factory.build(lusid.api.PortfoliosApi).get_portfolio(
+            return api_factory.build(lusid.PortfoliosApi).get_portfolio(
                 scope=kwargs["scope"], code=kwargs["code"]
             )
         # Add in here upsert portfolio properties if it does exist
-        except lusid.exceptions.ApiException as e:
+        except ApiException as e:
             if e.status == 404:
                 return api_factory.build(
-                    lusid.api.TransactionPortfoliosApi
+                    lusid.TransactionPortfoliosApi
                 ).create_portfolio(
                     scope=kwargs["scope"],
                     create_transaction_portfolio_request=portfolio_batch[0],
                 )
             else:
-                return e
+                raise e
 
     @staticmethod
     @run_in_executor
     def load_reference_portfolio_batch(
-            api_factory: lusid.SyncApiClientFactory,
+            api_factory: SyncApiClientFactory,
             reference_portfolio_batch: list,
             **kwargs,
-    ) -> lusid.models.Portfolio:
+    ) -> lusid.Portfolio:
         """
         Upserts a batch of reference portfolios to LUSID
 
         Parameters
         ----------
-        api_factory : lusid.SyncApiClientFactory
+        api_factory : SyncApiClientFactory
             the api factory to use
-        portfolio_batch : list[lusid.models.CreateReferencePortfolioRequest]
+        portfolio_batch : list[lusid.CreateReferencePortfolioRequest]
             The batch of reference portfolios to create
         scope : str
             The scope to create the reference portfolios in
@@ -391,7 +393,7 @@ class BatchLoader:
 
         Returns
         -------
-        lusid.models.ReferencePortfolio
+        lusid.ReferencePortfolio
             the response from LUSID
         """
 
@@ -406,35 +408,35 @@ class BatchLoader:
             )
 
         try:
-            return api_factory.build(lusid.api.PortfoliosApi).get_portfolio(
+            return api_factory.build(lusid.PortfoliosApi).get_portfolio(
                 scope=kwargs["scope"], code=kwargs["code"]
             )
         # TODO: Add in here upsert portfolio properties if it does exist
 
-        except lusid.exceptions.ApiException as e:
+        except ApiException as e:
             if e.status == 404:
                 return api_factory.build(
-                    lusid.api.ReferencePortfolioApi
+                    lusid.ReferencePortfolioApi
                 ).create_reference_portfolio(
                     scope=kwargs["scope"],
                     create_reference_portfolio_request=reference_portfolio_batch[0],
                 )
             else:
-                return e
+                raise e
 
     @staticmethod
     @run_in_executor
     def load_instrument_property_batch(
-            api_factory: lusid.SyncApiClientFactory, property_batch: list, **kwargs
-    ) -> List[lusid.models.UpsertInstrumentPropertiesResponse]:
+            api_factory: SyncApiClientFactory, property_batch: list, **kwargs
+    ) -> List[lusid.UpsertInstrumentPropertiesResponse]:
         """
         Add properties to the set instruments
 
         Parameters
         ----------
-        api_factory : lusid.SyncApiClientFactory
+        api_factory : SyncApiClientFactory
             The api factory to use
-        property_batch : list[lusid.models.UpsertInstrumentPropertyRequest]
+        property_batch : list[lusid.UpsertInstrumentPropertyRequest]
             Properties to add,
             identifiers will be resolved to a LusidInstrumentId, where an identifier resolves to more
             than one LusidInstrumentId the property will be added to all matching instruments
@@ -442,20 +444,20 @@ class BatchLoader:
 
         Returns
         -------
-        list[lusid.models.UpsertInstrumentPropertiesResponse]
+        list[lusid.UpsertInstrumentPropertiesResponse]
             the response from LUSID
         """
 
         results = []
         for request in property_batch:
-            search_request = lusid.models.InstrumentSearchProperty(
+            search_request = lusid.InstrumentSearchProperty(
                 key=f"instrument/default/{request.identifier_type}",
                 value=request.identifier,
             )
 
             # find the matching instruments
             mastered_instruments = api_factory.build(
-                lusid.api.SearchApi
+                lusid.SearchApi
             ).instruments_search(
                 instrument_search_property=[search_request], mastered_only=True
             )
@@ -467,7 +469,7 @@ class BatchLoader:
                     list(
                         map(
                             lambda m: m.identifiers["LusidInstrumentId"].value,
-                            mastered.mastered_instruments,
+                            (mastered.mastered_instruments or []),
                         )
                     )
                     for mastered in [matches for matches in mastered_instruments]
@@ -479,8 +481,8 @@ class BatchLoader:
                 continue
 
             properties_request = [
-                lusid.models.UpsertInstrumentPropertyRequest(
-                    identifier_type="LusidInstrumentId",
+                lusid.UpsertInstrumentPropertyRequest(
+                    identifierType="LusidInstrumentId",
                     identifier=luid,
                     properties=request.properties,
                 )
@@ -489,7 +491,7 @@ class BatchLoader:
 
             results.append(
                 api_factory.build(
-                    lusid.api.InstrumentsApi
+                    lusid.InstrumentsApi
                 ).upsert_instruments_properties(properties_request)
             )
 
@@ -498,18 +500,18 @@ class BatchLoader:
     @staticmethod
     @run_in_executor
     def load_portfolio_group_batch(
-            api_factory: lusid.SyncApiClientFactory,
+            api_factory: SyncApiClientFactory,
             portfolio_group_batch: list,
             **kwargs,
-    ) -> lusid.models.PortfolioGroup:
+    ) -> lusid.PortfolioGroup:
         """
         Upserts a batch of portfolios to LUSID
 
         Parameters
         ----------
-        api_factory : lusid.SyncApiClientFactory
+        api_factory : SyncApiClientFactory
             the api factory to use
-        portfolio_group_batch : list[lusid.models.CreateTransactionPortfolioRequest]
+        portfolio_group_batch : list[lusid.CreateTransactionPortfolioRequest]
             The batch of portfilios to create
         scope : str
             The scope to create the portfolio group in
@@ -519,7 +521,7 @@ class BatchLoader:
 
         Returns
         -------
-        lusid.models.PortfolioGroup
+        lusid.PortfolioGroup
             The response from LUSID
         """
 
@@ -542,7 +544,7 @@ class BatchLoader:
         try:
 
             current_portfolio_group = api_factory.build(
-                lusid.api.PortfolioGroupsApi
+                lusid.PortfolioGroupsApi
             ).get_portfolio_group(scope=kwargs["scope"], code=kwargs["code"])
 
             #  Capture all portfolios - the ones currently in group + the new ones to be added
@@ -576,34 +578,35 @@ class BatchLoader:
                 try:
 
                     current_portfolio_group = api_factory.build(
-                        lusid.api.PortfolioGroupsApi
+                        lusid.PortfolioGroupsApi
                     ).add_portfolio_to_group(
                         scope=kwargs["scope"],
                         code=kwargs["code"],
                         effective_at=datetime.now(tz=pytz.UTC).isoformat(),
-                        resource_id=lusid.models.ResourceId(scope=scope, code=code),
+                        resource_id=lusid.ResourceId(scope=scope, code=code),
                     )
 
-                except lusid.exceptions.ApiException as e:
-                    logging.error(json.loads(e.body)["title"])
+                except ApiException as e:
+                    if e.body is not None:
+                        logging.error(json.loads(e.body)["title"])
 
             return current_portfolio_group
 
         # Add in here upsert portfolio properties if it does exist
-        except lusid.exceptions.ApiException as e:
+        except ApiException as e:
             if e.status == 404:
                 return api_factory.build(
-                    lusid.api.PortfolioGroupsApi
+                    lusid.PortfolioGroupsApi
                 ).create_portfolio_group(
                     scope=kwargs["scope"],
                     create_portfolio_group_request=updated_request,
                 )
             else:
-                return e
+                raise e
 
 
 async def _load_data(
-        api_factory: lusid.SyncApiClientFactory,
+        api_factory: SyncApiClientFactory,
         single_requests: list,
         file_type: str,
         **kwargs,
@@ -613,7 +616,7 @@ async def _load_data(
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory
+    api_factory : SyncApiClientFactory
         The api factory to use
     single_requests
         The list of single requests for LUSID
@@ -700,14 +703,17 @@ def _convert_batch_to_models(
 
     # Get the types of the attributes on the top level model for this request
     open_api_types = get_attributes_and_types(getattr(
-        lusid.models, domain_lookup[file_type]["top_level_model"]
+        lusid_models, domain_lookup[file_type]["top_level_model"]
     ))
+
+    sub_holding_key_dtypes = None
+    sub_holding_keys_row = None
 
     # If there is a sub_holding_keys attribute and it has a dict type this means the sub_holding_keys
     # need to be populated with property values
     if (
             "sub_holding_keys" in open_api_types.keys()
-            and "Mapping" in open_api_types["sub_holding_keys"]
+            and ("Mapping" in open_api_types["sub_holding_keys"] or "dict(" in open_api_types["sub_holding_keys"])
     ):
         sub_holding_key_dtypes = data_frame.loc[:, sub_holding_keys].dtypes
     # If not and they are provided as full keys
@@ -749,7 +755,7 @@ def _convert_batch_to_models(
         # Create the sub-holding-keys for this row
         if (
                 "sub_holding_keys" in open_api_types.keys()
-                and "Mapping" in open_api_types["sub_holding_keys"]
+                and ("Mapping" in open_api_types["sub_holding_keys"] or "dict(" in open_api_types["sub_holding_keys"])
         ):
             sub_holding_keys_row = cocoon.properties.create_property_values(
                 row=row,
@@ -791,7 +797,7 @@ def _convert_batch_to_models(
 
 
 async def _construct_batches(
-        api_factory: lusid.SyncApiClientFactory,
+        api_factory: SyncApiClientFactory,
         data_frame: pd.DataFrame,
         mapping_required: dict,
         mapping_optional: dict,
@@ -811,7 +817,7 @@ async def _construct_batches(
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory
+    api_factory : SyncApiClientFactory
         The api factory to use
     data_frame : pd.DataFrame
         The DataFrame containing the data to load
@@ -857,6 +863,8 @@ async def _construct_batches(
         for file_type, settings in domain_lookup.items()
         if settings["portfolio_specific"]
     ]
+    sync_batches = []
+    async_batches = []
 
     if file_type in batching_no_portfolios:
 
@@ -995,7 +1003,7 @@ async def _construct_batches(
     # Raise any internal exceptions rather than propagating them to the response
     for response in responses_flattened:
         if isinstance(response, Exception) and not isinstance(
-                response, lusid.exceptions.ApiException
+                response, ApiException
         ):
             raise response
 
@@ -1050,13 +1058,13 @@ def check_for_unmatched_items(flag, file_type):
 
 @checkargs
 def unmatched_items(
-        api_factory: lusid.SyncApiClientFactory,
+        api_factory: SyncApiClientFactory,
         scope: str,
         data_frame: pd.DataFrame,
         mapping_required: dict,
         file_type: str,
         returned_response: dict,
-        sync_batches: list = None,
+        sync_batches: list | None = None,
 ):
     """
     This method orchestrates the identification of holdings or transactions objects that were successfully uploaded
@@ -1067,7 +1075,7 @@ def unmatched_items(
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory api_factory
+    api_factory : SyncApiClientFactory api_factory
         The api factory to use
     scope : str
         The scope of the resource to load the data into
@@ -1108,18 +1116,18 @@ def unmatched_items(
 
 
 def _unmatched_transactions(
-        api_factory: lusid.SyncApiClientFactory,
+        api_factory: SyncApiClientFactory,
         scope: str,
         data_frame: pd.DataFrame,
         mapping_required: dict,
-        sync_batches: list = None,
+        sync_batches: list | None = None,
 ):
     """
     This method identifies which instruments were not resolved with a transaction upload using load_from_data_frame.
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory api_factory
+    api_factory : SyncApiClientFactory api_factory
         The api factory to use
     scope : str
         The scope of the resource to load the data into
@@ -1133,11 +1141,14 @@ def _unmatched_transactions(
     responses: list
         A list of transaction objects to be appended to the ultimate response for load_from_data_frame.
     """
-    # Extract a list of portfolio codes from the sync_batches
-    portfolio_codes = extract_unique_portfolio_codes(sync_batches)
-
     # Create empty list to hold transaction ids and instruments
     unmatched_transactions = []
+
+    if sync_batches is None:
+        return unmatched_transactions
+
+    # Extract a list of portfolio codes from the sync_batches
+    portfolio_codes = extract_unique_portfolio_codes(sync_batches)
 
     # For each portfolio, request the unmatched transactions from LUSID and append to the instantiated list
     for portfolio_code in portfolio_codes:
@@ -1174,7 +1185,7 @@ def _unmatched_transactions(
 
 
 def return_unmatched_transactions(
-        api_factory: lusid.SyncApiClientFactory,
+        api_factory: SyncApiClientFactory,
         scope: str,
         code: str,
         from_transaction_date: str,
@@ -1187,7 +1198,7 @@ def return_unmatched_transactions(
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory api_factory
+    api_factory : SyncApiClientFactory api_factory
         The api factory to use
     scope : str
         The scope of the resource to load the data into
@@ -1198,7 +1209,7 @@ def return_unmatched_transactions(
     -------
     A list of transaction objects with the structure.
     """
-    transactions_api = api_factory.build(lusid.api.TransactionPortfoliosApi)
+    transactions_api = api_factory.build(lusid.TransactionPortfoliosApi)
     done = False
     next_page = None
     unmatched_transactions = []
@@ -1207,7 +1218,7 @@ def return_unmatched_transactions(
     while not done:
 
         # There must be a filter included so only transactions with unmatched instruments are returned
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "scope": scope,
             "code": code,
             "from_transaction_date": from_transaction_date,
@@ -1264,16 +1275,16 @@ def filter_unmatched_transactions(
 
 
 def _unmatched_holdings(
-        api_factory: lusid.SyncApiClientFactory,
+        api_factory: SyncApiClientFactory,
         scope: str,
-        sync_batches: list = None,
+        sync_batches: list | None = None,
 ):
     """
     This method identifies which instruments were not resolved with a holdings upload using load_from_data_frame.
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory api_factory
+    api_factory : SyncApiClientFactory api_factory
         The api factory to use
     scope : str
         The scope of the resource to load the data into
@@ -1285,11 +1296,13 @@ def _unmatched_holdings(
     responses: list
         A list of holding objects to be appended to the ultimate response for load_from_data_frame.
     """
-    # Extract a list of tuples of portfolio codes and effective at times from sync_batches
-    code_tuples = extract_unique_portfolio_codes_effective_at_tuples(sync_batches)
-
     # Create empty list to hold holdings that have not been resolved
     unmatched_holdings = []
+    if sync_batches is  None:
+        return unmatched_holdings
+
+    # Extract a list of tuples of portfolio codes and effective at times from sync_batches
+    code_tuples = extract_unique_portfolio_codes_effective_at_tuples(sync_batches)
 
     # For each holding adjustment in the upload, check whether any contained unresolved instruments and append to list
     for code_tuple in code_tuples:
@@ -1305,7 +1318,7 @@ def _unmatched_holdings(
 
 
 def return_unmatched_holdings(
-        api_factory: lusid.SyncApiClientFactory,
+        api_factory: SyncApiClientFactory,
         scope: str,
         code_tuple: Tuple[str, str],
 ):
@@ -1314,7 +1327,7 @@ def return_unmatched_holdings(
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory api_factory
+    api_factory : SyncApiClientFactory api_factory
         The api factory to use
     scope : str
         The scope of the resource to load the data into
@@ -1327,7 +1340,7 @@ def return_unmatched_holdings(
     A list of holding objects.
 
     """
-    transactions_api = api_factory.build(lusid.api.TransactionPortfoliosApi)
+    transactions_api = api_factory.build(lusid.TransactionPortfoliosApi)
 
     # In case a holdings check occurs for a portfolio code and effective at combination that contain no holdings,
     # make sure to gracefully handle the exception so that any LUSID error from the main upload is not suppressed.
@@ -1337,13 +1350,14 @@ def return_unmatched_holdings(
             code=code_tuple[0],
             effective_at=str(DateOrCutLabel(code_tuple[1])),
         )
-    except lusid.ApiException as e:
+    except ApiException as e:
         if "HoldingsAdjustmentDoesNotExist" in str(e.body):
             logging.info(
                 f"While validating holding upload, LUSID was unable to find any holdings within portfolio "
                 f"{code_tuple[0]} for effectiveAt {str(DateOrCutLabel(code_tuple[1]))}."
             )
             return []
+        raise
 
     # Create a list of holding objects with unmatched identifiers (e.g. with LUID_ZZZZZZZZ) from the response
     return [
@@ -1355,31 +1369,31 @@ def return_unmatched_holdings(
 
 @checkargs
 def load_from_data_frame(
-        api_factory: lusid.SyncApiClientFactory,
+        api_factory: SyncApiClientFactory,
         scope: str,
         data_frame: pd.DataFrame,
         mapping_required: dict,
         mapping_optional: dict,
         file_type: str,
-        identifier_mapping: dict = None,
-        property_columns: list = None,
-        properties_scope: str = None,
-        batch_size: int = None,
+        identifier_mapping: dict | None = None,
+        property_columns: list | None = None,
+        properties_scope: str | None = None,
+        batch_size: int | None = None,
         remove_white_space: bool = True,
         instrument_name_enrichment: bool = False,
-        transactions_commit_mode: str = None,
-        sub_holding_keys: list = None,
+        transactions_commit_mode: str | None = None,
+        sub_holding_keys: list | None = None,
         holdings_adjustment_only: bool = False,
         thread_pool_max_workers: int = 5,
-        sub_holding_keys_scope: str = None,
+        sub_holding_keys_scope: str | None = None,
         return_unmatched_items: bool = False,
-        instrument_scope: str = None,
+        instrument_scope: str | None = None,
 ):
     """
 
     Parameters
     ----------
-    api_factory : lusid.SyncApiClientFactory api_factory
+    api_factory : SyncApiClientFactory api_factory
         The api factory to use
     scope : str
         The scope of the resource to load the data into
@@ -1411,7 +1425,7 @@ def load_from_data_frame(
         Whether to use the adjust_holdings api call rather than set_holdings when working with holdings
     thread_pool_max_workers : int
         The maximum number of workers to use in the thread pool used by the function
-    sub_holding_keys_scope : str
+    sub_holding_keys_scope : str | None
         The scope to add the sub-holding keys to
     return_unmatched_items : bool
         When loading transactions or holdings, a 'True' flag will return a list of the transaction or holding
@@ -1541,48 +1555,48 @@ def load_from_data_frame(
     domain_lookup = cocoon.utilities.load_json_file("config/domain_settings.json")
 
     # Convert the file type to lower case & singular as well as checking it is of the allowed value
-    file_type = (
+    file_type = cast(str, (
         Validator(file_type, "file_type")
         .make_singular()
         .make_lower()
         .check_allowed_value(list(domain_lookup.keys()))
         .value
-    )
+    ))
 
     # Ensures that it is a single index dataframe
     Validator(data_frame.index, "data_frame_index").check_is_not_instance(pd.MultiIndex)
 
     # Set defaults aligned with the data type of each argument, this allows for users to provide None
-    identifier_mapping = (
+    identifier_mapping = cast(dict, (
         Validator(identifier_mapping, "identifier_mapping")
         .set_default_value_if_none(default={})
         .discard_dict_keys_none_value()
         .value
-    )
+    ))
 
-    properties_scope = (
+    properties_scope = cast(str, (
         Validator(properties_scope, "properties_scope")
         .set_default_value_if_none(default=scope)
         .value
-    )
+    ))
 
-    sub_holding_keys_scope = (
+    sub_holding_keys_scope = cast(str, (
         Validator(sub_holding_keys_scope, "sub_holding_keys_scope")
         .set_default_value_if_none(default=properties_scope)
         .value
-    )
+    ))
 
-    instrument_scope = (
+    instrument_scope = cast(str, (
         Validator(instrument_scope, "instrument_scope")
         .set_default_value_if_none(default="default")
         .value
-    )
+    ))
 
-    property_columns = (
+    property_columns = cast(list, (
         Validator(property_columns, "property_columns")
         .set_default_value_if_none(default=[])
         .value
-    )
+    ))
 
     property_columns = [
         {"source": column, "target": column} if isinstance(column, str) else column
@@ -1593,13 +1607,13 @@ def load_from_data_frame(
         property_columns, "property_columns"
     ).check_entries_are_strings_or_dict_containing_key("source")
 
-    sub_holding_keys = (
+    sub_holding_keys = cast(list, (
         Validator(sub_holding_keys, "sub_holding_keys")
         .set_default_value_if_none(default=[])
         .value
-    )
+    ))
 
-    batch_size = (
+    batch_size = cast(int, (
         Validator(batch_size, "batch_size")
         .set_default_value_if_none(domain_lookup[file_type]["default_batch_size"])
         .override_value(
@@ -1607,20 +1621,20 @@ def load_from_data_frame(
             domain_lookup[file_type]["default_batch_size"],
         )
         .value
-    )
+    ))
 
     # Discard mappings where the provided value is None
-    mapping_required = (
+    mapping_required = cast(dict, (
         Validator(mapping_required, "mapping_required")
         .discard_dict_keys_none_value()
         .value
-    )
+    ))
 
-    mapping_optional = (
+    mapping_optional = cast(dict, (
         Validator(mapping_optional, "mapping_optional")
         .discard_dict_keys_none_value()
         .value
-    )
+    ))
 
     required_call_attributes = domain_lookup[file_type]["required_call_attributes"]
     if "scope" in required_call_attributes:
@@ -1688,7 +1702,7 @@ def load_from_data_frame(
     # Get all the DataFrame columns as well as those that contain at least one null value
     data_frame_columns = list(data_frame.columns.values)
     nan_columns = [
-        column for column in data_frame_columns if data_frame[column].isna().any()
+        column for column in data_frame_columns if bool(data_frame[column].isna().any())
     ]
 
     # Validate that none of the provided columns are missing or invalid
@@ -1723,7 +1737,7 @@ def load_from_data_frame(
     if remove_white_space:
         column_list = [source_columns]
         for col in [mapping_optional, mapping_required, identifier_mapping]:
-            column_list.append(col.values())
+            column_list.append(list(col.values()))
 
         column_list = list(set([item for sublist in column_list for item in sublist]))
         data_frame = strip_whitespace(data_frame, column_list)
@@ -1731,14 +1745,14 @@ def load_from_data_frame(
     # Get the types of the attributes on the top level model for this request
     
     open_api_types = get_attributes_and_types(getattr(
-        lusid.models, domain_lookup[file_type]["top_level_model"]
+        lusid_models, domain_lookup[file_type]["top_level_model"]
     ))
 
     # If there is a sub_holding_keys attribute and it has a dict type this means the sub_holding_keys
     # need to have a property definition and be populated with values from the provided dataframe columns
     if (
             "sub_holding_keys" in open_api_types.keys()
-            and "Mapping[" in open_api_types["sub_holding_keys"]
+            and ("Mapping[" in open_api_types["sub_holding_keys"] or "dict(" in open_api_types["sub_holding_keys"])
     ):
         Validator(sub_holding_keys, "sub_holding_key_columns").check_subset_of_list(
             data_frame_columns, "DataFrame Columns"
@@ -1788,7 +1802,7 @@ def load_from_data_frame(
         )
 
         transaction_portfolio_api = api_factory.build(
-            lusid.api.TransactionPortfoliosApi
+            lusid.TransactionPortfoliosApi
         )
 
         # Add subholding keys to the portfolios we are going to apply the transactions to
@@ -1796,7 +1810,7 @@ def load_from_data_frame(
             transaction_portfolio_api.patch_portfolio_details(
                 scope,
                 code,
-                [
+                cast(Any, [
                     {
                         "value": cocoon.properties._infer_full_property_keys(
                             partial_keys=sub_holding_keys,
@@ -1806,7 +1820,7 @@ def load_from_data_frame(
                         "path": "/subHoldingKeys",
                         "op": "add",
                     }
-                ],
+                ]),
             )
 
         # Add sub-holding keys to the properties, so it is created for each transaction.

@@ -1,20 +1,20 @@
 import os
 import re
-import unittest
 import json
 from pathlib import Path
 import pandas as pd
-import lusid
+import finbourne.sdk.services.lusid as lusid
+from finbourne.sdk.extensions import SyncApiClientFactory
 from finbourne_sdk_utils import logger
 from finbourne_sdk_utils.cocoon.cocoon import load_from_data_frame
 from finbourne_sdk_utils.cocoon.cocoon_printer import format_portfolios_response
 
 
-class CocoonPrinterIntegrationTests(unittest.TestCase):
+class TestCocoonPrinterIntegration:
     @classmethod
-    def setUpClass(cls) -> None:
+    def setup_class(cls) -> None:
         
-        cls.api_factory = lusid.SyncApiClientFactory()
+        cls.api_factory = SyncApiClientFactory()
         
         cls.logger = logger.LusidLogger(os.getenv("FBN_LOG_LEVEL", "info"))
 
@@ -46,10 +46,10 @@ class CocoonPrinterIntegrationTests(unittest.TestCase):
         )
 
         # Assert that the error part includes RequestID details and ErrorDetails
-        self.assertEqual(2, len(succ))
-        self.assertEqual(1, len(err))
+        assert 2 == len(succ)
+        assert 1 == len(err)
         for index, row in err.iterrows():
-            self.assertEqual(row[err.columns[0]], "Bad Request")
+            assert row[err.columns[0]] == "Bad Request"
             
             
             # regex for new and old request id patterns
@@ -57,25 +57,21 @@ class CocoonPrinterIntegrationTests(unittest.TestCase):
 
             foundRequestId = False
             for pattern in patterns:
-                match = re.search(pattern, row[err.columns[2]])
+                match = re.search(pattern, str(row[err.columns[2]]))
                 if match:
                     print(f"{match.group(1)} matched pattern: {pattern}")
                     foundRequestId = True
                     break
                 
-            self.assertTrue(foundRequestId, "No request id found in error message")
+            assert foundRequestId, "No request id found in error message"
                     
             # Deserialise the ErrorDetails field and check one of the values
-            self.assertEqual(
-                json.loads(row[err.columns[3]]).get("name"), "UndefinedCurrencyFailure"
-            )
+            assert json.loads(str(row[err.columns[3]])).get("name") == "UndefinedCurrencyFailure"
 
         # Delete the portfolios at the end of the test
         for portfolio in portfolio_response.get("portfolios").get("success"):
-            self.api_factory.build(lusid.api.PortfoliosApi).delete_portfolio(
+            self.api_factory.build(lusid.PortfoliosApi).delete_portfolio(
                 scope="cocoon_format_errors", code=portfolio.id.code
             )
 
 
-if __name__ == "__main__":
-    unittest.main()

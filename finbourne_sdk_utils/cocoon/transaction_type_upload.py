@@ -1,5 +1,5 @@
-import lusid
-import lusid.models as models
+import finbourne.sdk.services.lusid as lusid
+import finbourne.sdk.services.lusid.models as models
 import logging
 
 logger = logging.getLogger()
@@ -12,21 +12,21 @@ def create_transaction_type_configuration(api_factory, alias, movements):
     Parameters
     ----------
     api_factory :  The LUSID api factory to use
-    alias : lusid.models.TransactionConfigurationTypeAlias
+    alias : lusid.TransactionConfigurationTypeAlias
         An aliases with type and group
-    movements : list[lusid.models.TransactionConfigurationMovementDataRequest]
+    movements : list[lusid.TransactionConfigurationMovementDataRequest]
         The movements to use for
         transaction type
 
     Returns
     -------
-    response : (lusid.models.createtransactiontyperesponse)
+    response : (lusid.createtransactiontyperesponse)
         The response from creating the transaction type
     """
 
     # Call LUSID to get your transaction type configuration
     response = api_factory.build(
-        lusid.api.SystemConfigurationApi
+        lusid.SystemConfigurationApi
     ).list_configuration_transaction_types()
 
     aliases_current = [
@@ -49,7 +49,7 @@ def create_transaction_type_configuration(api_factory, alias, movements):
     logger.info(f"Creating a new transaction aliases called: {alias.type}")
 
     response = api_factory.build(
-        lusid.api.SystemConfigurationApi
+        lusid.SystemConfigurationApi
     ).create_configuration_transaction_type(
         transaction_configuration_data_request=models.TransactionConfigurationDataRequest(
             aliases=[alias], movements=movements
@@ -68,19 +68,19 @@ def upsert_transaction_type_alias(api_factory, new_transaction_config):
     ----------
     api_factory: factory
         The LUSID api factory to use.
-    new_transaction_config: list[lusid.models.TransactionConfigurationDataRequest]
+    new_transaction_config: list[lusid.TransactionConfigurationDataRequest]
         A list of new transaction type configurations
 
     Returns
     -------
-    response : (lusid.models.TransactionSetConfigurationData)
+    response : (lusid.TransactionSetConfigurationData)
         The response from setting the transaction type
     """
 
     # Call LUSID to get a list of the current transaction types
 
     current_transaction_types = api_factory.build(
-        lusid.api.SystemConfigurationApi
+        lusid.SystemConfigurationApi
     ).list_configuration_transaction_types()
 
     transaction_configs_list = current_transaction_types.transaction_configs
@@ -125,7 +125,7 @@ def upsert_transaction_type_alias(api_factory, new_transaction_config):
     transaction_configs_list = transaction_configs_list + new_transaction_config
 
     set_response = api_factory.build(
-        lusid.api.SystemConfigurationApi
+        lusid.SystemConfigurationApi
     ).set_configuration_transaction_types(
         transaction_set_configuration_data_request=models.TransactionSetConfigurationDataRequest(
             transaction_config_requests=transaction_configs_list,

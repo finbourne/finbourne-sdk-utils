@@ -1,11 +1,11 @@
+import pytest
 import os
-import unittest
 from pathlib import Path
 import pandas as pd
 
 from finbourne_sdk_utils import cocoon as cocoon
-from parameterized import parameterized
-import lusid
+import finbourne.sdk.services.lusid as lusid
+from finbourne.sdk.extensions import SyncApiClientFactory
 from finbourne_sdk_utils import logger
 from datetime import datetime
 import pytz
@@ -16,11 +16,11 @@ unique_properties_scope = create_scope_id()
 
 def expected_response(property_scope="TestPropertiesScope1"):
     return {
-        "instruments": lusid.models.UpsertInstrumentsResponse(
+        "instruments": lusid.UpsertInstrumentsResponse(
             values={
-                "ClientInternal: imd_34534539": lusid.models.Instrument(
+                "ClientInternal: imd_34534539": lusid.Instrument(
                     lusid_instrument_id="LUIDUnknown",
-                    version=lusid.models.Version(
+                    version=lusid.Version(
                         as_at_date=datetime.now(pytz.UTC),
                         effective_from=datetime.now(pytz.UTC),
                     ),
@@ -32,17 +32,17 @@ def expected_response(property_scope="TestPropertiesScope1"):
                     },
                     state="Active",
                     properties=[
-                        lusid.models.ModelProperty(
+                        lusid.ModelProperty(
                             effective_from=datetime.min.replace(tzinfo=pytz.UTC),
                             effective_until=datetime.max.replace(tzinfo=pytz.UTC),
                             key=f"Instrument/{property_scope}/currency",
-                            value=lusid.models.PropertyValue(label_value="USD"),
+                            value=lusid.PropertyValue(label_value="USD"),
                         ),
-                        lusid.models.ModelProperty(
+                        lusid.ModelProperty(
                             effective_from=datetime.min.replace(tzinfo=pytz.UTC),
                             effective_until=datetime.max.replace(tzinfo=pytz.UTC),
                             key=f"Instrument/{property_scope}/moodys_rating",
-                            value=lusid.models.PropertyValue(label_value="Aa2"),
+                            value=lusid.PropertyValue(label_value="Aa2"),
                         ),
                     ],
                 )
@@ -52,18 +52,18 @@ def expected_response(property_scope="TestPropertiesScope1"):
     }
 
 
-class CocoonTestsInstruments(unittest.TestCase):
+class TestCocoonInstruments:
     @classmethod
-    def setUpClass(cls) -> None:
+    def setup_class(cls) -> None:
 
-        cls.api_factory = lusid.SyncApiClientFactory()
+        cls.api_factory = SyncApiClientFactory()
         
         cls.logger = logger.LusidLogger(os.getenv("FBN_LOG_LEVEL", "info"))
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "scope, file_name, mapping_required, mapping_optional, identifier_mapping, property_columns, properties_scope, instrument_scope, expected_outcome",
         [
-            [
-                "A standard successful load of scoped instruments",
+            (
                 "TestScope1",
                 "data/global-fund-combined-instrument-master.csv",
                 {"name": "instrument_name"},
@@ -73,9 +73,8 @@ class CocoonTestsInstruments(unittest.TestCase):
                 "TestPropertiesScope1",
                 "TestScope1",
                 expected_response(),
-            ],
-            [
-                "A successful load of instruments to default scope",
+            ),
+            (
                 "TestScope1",
                 "data/global-fund-combined-instrument-master.csv",
                 {"name": "instrument_name"},
@@ -85,9 +84,8 @@ class CocoonTestsInstruments(unittest.TestCase):
                 "TestPropertiesScope1",
                 None,
                 expected_response(),
-            ],
-            [
-                "A standard successful load of instruments with string index",
+            ),
+            (
                 "TestScope1",
                 "data/global-fund-combined-instrument-master-string-index.csv",
                 {"name": "instrument_name"},
@@ -97,9 +95,8 @@ class CocoonTestsInstruments(unittest.TestCase):
                 "TestPropertiesScope1",
                 "TestScope1",
                 expected_response(),
-            ],
-            [
-                "A standard successful load of instruments with duplicates in index",
+            ),
+            (
                 "TestScope1",
                 "data/global-fund-combined-instrument-master-duplicate-index.csv",
                 {"name": "instrument_name"},
@@ -109,9 +106,8 @@ class CocoonTestsInstruments(unittest.TestCase):
                 "TestPropertiesScope1",
                 "TestScope1",
                 expected_response(),
-            ],
-            [
-                "A standard successful load of instruments with unique properties scope",
+            ),
+            (
                 "TestScope1",
                 "data/global-fund-combined-instrument-master.csv",
                 {"name": "instrument_name"},
@@ -121,9 +117,8 @@ class CocoonTestsInstruments(unittest.TestCase):
                 f"TestPropertiesScope1_{unique_properties_scope}",
                 "TestScope1",
                 expected_response(f"TestPropertiesScope1_{unique_properties_scope}"),
-            ],
-            [
-                "Additional attributes in the both required and optional mapping that don't exist in LUSID but are in the dataframe",
+            ),
+            (
                 "TestScope1",
                 "data/global-fund-combined-instrument-master.csv",
                 {"name": "instrument_name", "position": "instrument_name"},
@@ -133,9 +128,8 @@ class CocoonTestsInstruments(unittest.TestCase):
                 "TestPropertiesScope1",
                 "TestScope1",
                 expected_response(),
-            ],
-            [
-                "A different way of specifying the identifiers",
+            ),
+            (
                 "TestScope1",
                 "data/global-fund-combined-instrument-master.csv",
                 {"name": "instrument_name"},
@@ -149,9 +143,8 @@ class CocoonTestsInstruments(unittest.TestCase):
                 "TestPropertiesScope1",
                 "TestScope1",
                 expected_response(),
-            ],
-            [
-                "Providing a default for a required field which has some missing values",
+            ),
+            (
                 "TestScope1",
                 "data/global-fund-combined-instrument-master-missing-names.csv",
                 {
@@ -170,9 +163,8 @@ class CocoonTestsInstruments(unittest.TestCase):
                 "TestPropertiesScope1",
                 "TestScope1",
                 expected_response(),
-            ],
-            [
-                "Providing a default for a required field which has some missing values",
+            ),
+            (
                 "TestScope1",
                 "data/global-fund-combined-instrument-master-missing-names.csv",
                 {
@@ -191,9 +183,8 @@ class CocoonTestsInstruments(unittest.TestCase):
                 "TestPropertiesScope1",
                 "TestScope1",
                 expected_response(),
-            ],
-            [
-                "Loading instruments with duplicate rows for the same instrument",
+            ),
+            (
                 "TestScope1",
                 "data/global-fund-combined-instrument-master-duplicates.csv",
                 {"name": "instrument_name"},
@@ -203,12 +194,11 @@ class CocoonTestsInstruments(unittest.TestCase):
                 "TestPropertiesScope1",
                 "TestScope1",
                 expected_response(),
-            ],
+            ),
         ]
     )
     def test_load_from_data_frame_instruments_success(
         self,
-        _,
         scope,
         file_name,
         mapping_required,
@@ -250,11 +240,7 @@ class CocoonTestsInstruments(unittest.TestCase):
             instrument_scope=instrument_scope,
         )
 
-        self.assertEqual(
-            0,
-            len(responses["instruments"]["errors"]),
-            responses["instruments"]["errors"],
-        )
+        assert 0 == len(responses["instruments"]["errors"]), responses["instruments"]["errors"]
 
         failed = [
             f
@@ -262,20 +248,17 @@ class CocoonTestsInstruments(unittest.TestCase):
             for f in response.failed.values()
         ]
 
-        self.assertEqual(0, len(failed), failed)
+        assert 0 == len(failed), failed
 
-        self.assertEqual(
-            first=sum(
+        assert sum(
                 [
                     len(response.values)
                     for response in responses["instruments"]["success"]
                 ]
-            ),
-            second=len(data_frame["client_internal"].unique()),
-        )
+            ) == len(data_frame["client_internal"].unique())
 
         # Assert that by no unmatched_identifiers are returned in the response for instruments
-        self.assertFalse(responses["instruments"].get("unmatched_identifiers", False))
+        assert not responses["instruments"].get("unmatched_identifiers", False)
 
         combined_successes = {
             correlation_id: instrument
@@ -283,26 +266,22 @@ class CocoonTestsInstruments(unittest.TestCase):
             for correlation_id, instrument in response.values.items()
         }
 
-        self.assertTrue(
-            expr=all(
+        assert all(
                 sorted(combined_successes[key].properties, key=lambda p: p.key)
                 == sorted(value.properties, key=lambda p: p.key)
                 for key, value in expected_outcome["instruments"].values.items()
             )
-        )
 
         # Assert that instruments has been assigned a scope value
-        self.assertTrue(
-            expr=all(
+        assert all(
                 instrument.scope == instrument_scope if instrument_scope is not None else "default"
                 for response in responses["instruments"]["success"]
                 for instrument in response.values.values()
             )
-        )
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "scope, file_name, mapping_required, mapping_optional, identifier_mapping, property_columns, properties_scope, expected_outcome",
         [
-            [
-                "Using instrument name enrichment to populate missing names",
+            (
                 "TestScope1",
                 "data/global-fund-combined-instrument-master-missing-names.csv",
                 {
@@ -320,13 +299,12 @@ class CocoonTestsInstruments(unittest.TestCase):
                 ["s&p rating", "moodys_rating", "currency"],
                 "TestPropertiesScope1",
                 expected_response(),
-            ]
+            )
         ]
     )
-    @unittest.skip("Skipping test as OpenFigi is broken currently")
+    @pytest.mark.skip("Skipping test as OpenFigi is broken currently")
     def test_load_from_data_frame_instruments_enrichment_success(
         self,
-        _,
         scope,
         file_name,
         mapping_required,
@@ -366,32 +344,25 @@ class CocoonTestsInstruments(unittest.TestCase):
             instrument_name_enrichment=True,
         )
 
-        self.assertEqual(
-            first=sum(
+        assert sum(
                 [
                     len(response.values)
                     for response in responses["instruments"]["success"]
                 ]
-            ),
-            second=len(data_frame),
-        )
+            ) == len(data_frame)
 
-        self.assertEqual(
-            first=responses["instruments"]["success"][0]
+        assert (
+            responses["instruments"]["success"][0]
             .values["ClientInternal: imd_43535553"]
-            .name,
-            second="BP PLC",
+            .name == "BP PLC"
         )
 
-        self.assertEqual(
-            first=sum(
+        assert sum(
                 [
                     len(response.failed)
                     for response in responses["instruments"]["success"]
                 ]
-            ),
-            second=0,
-        )
+            ) == 0
 
         combined_successes = {
             correlation_id: instrument
@@ -399,19 +370,17 @@ class CocoonTestsInstruments(unittest.TestCase):
             for correlation_id, instrument in response.values.items()
         }
 
-        self.assertTrue(
-            expr=all(
+        assert all(
                 sorted(combined_successes[key].properties, key=lambda p: p.key)
                 == sorted(value.properties, key=lambda p: p.key)
                 for key, value in expected_outcome["instruments"].values.items()
             )
-        )
 
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "scope, file_name_with_whitespace, file_name_clean, mapping_required, mapping_optional, identifier_mapping, property_columns, properties_scope, expected_outcome",
         [
-            [
-                "A standard successful load of instruments with whitespace",
+            (
                 "TestScope2",
                 "data/global-fund-combined-instrument-master-with-whitespace.csv",
                 "data/global-fund-combined-instrument-master.csv",
@@ -421,12 +390,11 @@ class CocoonTestsInstruments(unittest.TestCase):
                 ["s&p rating", "moodys_rating", "currency"],
                 "TestPropertiesScope1",
                 expected_response(),
-            ]
+            )
         ]
     )
     def test_load_from_data_frame_instruments_with_strip(
         self,
-        _,
         scope,
         file_name_with_whitespace,
         file_name_clean,
@@ -469,25 +437,19 @@ class CocoonTestsInstruments(unittest.TestCase):
             remove_white_space=True,
         )
 
-        self.assertEqual(
-            len(data_frame_true["client_internal"].unique()),
-            sum(
+        assert len(data_frame_true["client_internal"].unique()) == sum(
                 [
                     len(response.values)
                     for response in responses["instruments"]["success"]
                 ]
-            ),
-        )
+            )
 
-        self.assertEqual(
-            0,
-            sum(
+        assert 0 == sum(
                 [
                     len(response.failed)
                     for response in responses["instruments"]["success"]
                 ]
-            ),
-        )
+            )
 
         combined_successes = {
             correlation_id: instrument
@@ -495,13 +457,11 @@ class CocoonTestsInstruments(unittest.TestCase):
             for correlation_id, instrument in response.values.items()
         }
 
-        self.assertTrue(
-            expr=all(
+        assert all(
                 sorted(combined_successes[key].properties, key=lambda p: p.key)
                 == sorted(value.properties, key=lambda p: p.key)
                 for key, value in expected_outcome["instruments"].values.items()
             )
-        )
 
     def test_load_instrument_properties(self,):
         data_frame = pd.DataFrame(
@@ -536,7 +496,7 @@ class CocoonTestsInstruments(unittest.TestCase):
             identifier_mapping=identifier_mapping,
         )
 
-        self.assertGreater(len(responses["instruments"]["success"]), 0)
+        assert len(responses["instruments"]["success"]) > 0
 
         properties_df = pd.DataFrame(
             {
@@ -570,13 +530,11 @@ class CocoonTestsInstruments(unittest.TestCase):
             for success in batch
         ]
 
-        self.assertEqual(len(errors), 0)
-        self.assertGreater(len(successes), 0)
+        assert len(errors) == 0
+        assert len(successes) > 0
 
         # Assert that by no unmatched_identifiers are returned in the response for instrument_propertys
-        self.assertFalse(
-            result["instrument_propertys"].get("unmatched_identifiers", False)
-        )
+        assert not result["instrument_propertys"].get("unmatched_identifiers", False)
 
     def test_load_instrument_properties_with_missing_instruments(self):
         properties_df = pd.DataFrame({"isin": ["blah"], "category": ["Oil & Gas"]})
@@ -607,12 +565,13 @@ class CocoonTestsInstruments(unittest.TestCase):
             for success in batch
         ]
 
-        self.assertEqual(len(errors), 0)
-        self.assertEqual(len(successes), 0)
+        assert len(errors) == 0
+        assert len(successes) == 0
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "test_name, df, mapping",
         [
-            [
+            (
                 "load only lookthrough instruments",
                 Path(__file__).parent.joinpath(
                     "data/lookthrough_instr_tests/load_lookthrough_instrument.csv"
@@ -625,8 +584,8 @@ class CocoonTestsInstruments(unittest.TestCase):
                         "look_through_portfolio_id.code": "lookthrough_code",
                     },
                 },
-            ],
-            [
+            ),
+            (
                 "load mixed lookthrough instruments",
                 Path(__file__).parent.joinpath(
                     "data/lookthrough_instr_tests/mixed_lookthrough_instruments.csv"
@@ -639,8 +598,8 @@ class CocoonTestsInstruments(unittest.TestCase):
                         "look_through_portfolio_id.code": "lookthrough_code",
                     },
                 },
-            ],
-            [
+            ),
+            (
                 "load mixed lookthrough instruments with default scope",
                 Path(__file__).parent.joinpath(
                     "data/lookthrough_instr_tests/mixed_instruments_default_scope.csv"
@@ -653,8 +612,8 @@ class CocoonTestsInstruments(unittest.TestCase):
                         "look_through_portfolio_id.code": "lookthrough_code",
                     },
                 },
-            ],
-            [
+            ),
+            (
                 "load mixed lookthrough instruments with default scope with multiple portfolios",
                 Path(__file__).parent.joinpath(
                     "data/lookthrough_instr_tests/mixed_lookthrough_instruments_multiple portfolios.csv"
@@ -667,8 +626,8 @@ class CocoonTestsInstruments(unittest.TestCase):
                         "look_through_portfolio_id.code": "lookthrough_code",
                     },
                 },
-            ],
-            [
+            ),
+            (
                 "multiple_instruments_with_same_portfolio",
                 Path(__file__).parent.joinpath(
                     "data/lookthrough_instr_tests/multiple_instruments_with_same_portfolio.csv"
@@ -681,13 +640,13 @@ class CocoonTestsInstruments(unittest.TestCase):
                         "look_through_portfolio_id.code": "lookthrough_code",
                     },
                 },
-            ],
+            ),
         ]
     )
-    def test_load_instrument_lookthrough(self, _, df, mapping):
+    def test_load_instrument_lookthrough(self, test_name, df, mapping):
 
-        if "default scope" in _:
-            self.skipTest("Default parameter using '$' is not supported")
+        if "default scope" in test_name:
+            pytest.skip("Default parameter using '$' is not supported")
 
         scope = "test-lookthrough-loading-finbourne_sdk_utils"
         df = pd.read_csv(df)
@@ -706,9 +665,9 @@ class CocoonTestsInstruments(unittest.TestCase):
 
         # create portfolios
         [
-            self.api_factory.build(lusid.api.TransactionPortfoliosApi).create_portfolio(
+            self.api_factory.build(lusid.TransactionPortfoliosApi).create_portfolio(
                 scope=scope,
-                create_transaction_portfolio_request=lusid.models.CreateTransactionPortfolioRequest(
+                create_transaction_portfolio_request=lusid.CreateTransactionPortfolioRequest(
                     display_name=row["client_internal"],
                     description=row["client_internal"],
                     code=row["client_internal"],
@@ -733,35 +692,30 @@ class CocoonTestsInstruments(unittest.TestCase):
         )
 
         # check successes, errors and instrument lookthrough codes
-        self.assertEqual(
-            len(instr_response["instruments"]["success"][0].values.values()), len(df)
-        )
-        self.assertEqual(len(instr_response["instruments"]["errors"]), 0)
+        assert len(instr_response["instruments"]["success"][0].values.values()) == len(df)
+        assert len(instr_response["instruments"]["errors"]) == 0
 
         # check lookthrough code on response
-        [
-            self.assertEqual(
-                instr_response["instruments"]["success"][0]
-                .values[f"ClientInternal: {row['client_internal']}"]
-                .lookthrough_portfolio.code,
-                row["lookthrough_code"],
-            )
-            if "id" not in row["client_internal"]
-            else None
-            for index, row in df.iterrows()
-        ]
+        for index, row in df.iterrows():
+            if "id" not in row["client_internal"]:
+                assert (
+                    instr_response["instruments"]["success"][0]
+                    .values[f"ClientInternal: {row['client_internal']}"]
+                    .lookthrough_portfolio.code
+                    == row["lookthrough_code"]
+                )
 
         # tear down this test
         [
-            self.api_factory.build(lusid.api.PortfoliosApi).delete_portfolio(
-                scope=scope, code=code
+            self.api_factory.build(lusid.PortfoliosApi).delete_portfolio(
+                scope=scope, code=str(code)
             )
-            if "id" not in code
+            if "id" not in str(code)
             else None
             for code in list(codes.values())
         ]
         [
-            self.api_factory.build(lusid.api.InstrumentsApi).delete_instrument(
+            self.api_factory.build(lusid.InstrumentsApi).delete_instrument(
                 "ClientInternal", CI,
             )
             for CI in list(df["client_internal"])

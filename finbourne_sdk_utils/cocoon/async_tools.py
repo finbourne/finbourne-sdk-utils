@@ -32,7 +32,7 @@ def stop_event_loop_new_thread(loop: asyncio.AbstractEventLoop) -> None:
 
     """
 
-    thread_id = loop._thread_id
+    thread_id = loop._thread_id # type: ignore
     loop.call_soon_threadsafe(loop.stop)
     threads = enumerate()
     match = [thread for thread in threads if thread.ident == thread_id]
