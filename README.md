@@ -10,7 +10,9 @@ This SDK package contains a set of utility functions for interacting with [LUSID
 
 ## Installation
 
-The PyPi package for lusid-python-tools can installed globally on your machine using the following command:
+The PyPi package for finbourne-sdk-utils can be installed globally on your machine using the following command:
+
+If you are using the *V3 Python SDK* please use a version greater than *1.0.0*, if you're using the *V2* use a version *less than 1.0.0*
 
 ```sh
 $ pip install finbourne-sdk-utils
