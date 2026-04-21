@@ -1,9 +1,127 @@
 import pandas
 import pytest
-
+from finbourne_sdk_utils.lpt.either import Either as _Either
+from finbourne_sdk_utils.lpt.pager import page_all_results as _page_all_results
+from finbourne_sdk_utils.lpt.record import Rec as _Rec
 from finbourne_sdk_utils.lpt import lpt
+from finbourne_sdk_utils.lpt import (
+    add_days,
+    chunk,
+    display_df,
+    display_error,
+    dump_stats,
+    Either,
+    from_date,
+    from_df,
+    is_path_supported_excel_with_sheet,
+    page_all_results,
+    perpetual_upsert,
+    process_input,
+    read_csv,
+    read_input,
+    Rec,
+    records_to_df,
+    Serialise,
+    standard_flow,
+    to_date,
+    to_df,
+    to_instrument_identifiers,
+    trim_df,
+)
 
 EMPTY_DF = pandas.DataFrame()
+
+
+class TestPackageExports:
+    """Tests that key functions are importable directly from finbourne_sdk_utils.lpt"""
+
+    def test_to_date_is_exported(self):
+        assert callable(to_date)
+        assert to_date is lpt.to_date
+
+    def test_from_date_is_exported(self):
+        assert callable(from_date)
+        assert from_date is lpt.from_date
+
+    def test_to_df_is_exported(self):
+        assert callable(to_df)
+        assert to_df is lpt.to_df
+
+    def test_from_df_is_exported(self):
+        assert callable(from_df)
+        assert from_df is lpt.from_df
+
+    def test_add_days_is_exported(self):
+        assert callable(add_days)
+        assert add_days is lpt.add_days
+
+    def test_chunk_is_exported(self):
+        assert callable(chunk)
+        assert chunk is lpt.chunk
+
+    def test_display_df_is_exported(self):
+        assert callable(display_df)
+        assert display_df is lpt.display_df
+
+    def test_display_error_is_exported(self):
+        assert callable(display_error)
+        assert display_error is lpt.display_error
+
+    def test_dump_stats_is_exported(self):
+        assert callable(dump_stats)
+        assert dump_stats is lpt.dump_stats
+
+    def test_either_is_exported(self):
+        assert callable(Either)
+        assert Either is _Either
+
+    def test_is_path_supported_excel_with_sheet_is_exported(self):
+        assert callable(is_path_supported_excel_with_sheet)
+        assert is_path_supported_excel_with_sheet is lpt.is_path_supported_excel_with_sheet
+
+    def test_page_all_results_is_exported(self):
+        assert callable(page_all_results)
+        assert page_all_results is _page_all_results
+
+    def test_perpetual_upsert_is_exported(self):
+        assert callable(perpetual_upsert)
+        assert perpetual_upsert is lpt.perpetual_upsert
+
+    def test_process_input_is_exported(self):
+        assert callable(process_input)
+        assert process_input is lpt.process_input
+
+    def test_read_csv_is_exported(self):
+        assert callable(read_csv)
+        assert read_csv is lpt.read_csv
+
+    def test_read_input_is_exported(self):
+        assert callable(read_input)
+        assert read_input is lpt.read_input
+
+    def test_rec_is_exported(self):
+        assert callable(Rec)
+        assert Rec is _Rec
+
+    def test_records_to_df_is_exported(self):
+        assert callable(records_to_df)
+        assert records_to_df is lpt.records_to_df
+
+    def test_serialise_is_exported(self):
+        assert callable(Serialise)
+        assert Serialise is lpt.Serialise
+
+    def test_standard_flow_is_exported(self):
+        assert callable(standard_flow)
+        assert standard_flow is lpt.standard_flow
+
+    def test_to_instrument_identifiers_is_exported(self):
+        assert callable(to_instrument_identifiers)
+        assert to_instrument_identifiers is lpt.to_instrument_identifiers
+
+    def test_trim_df_is_exported(self):
+        assert callable(trim_df)
+        assert trim_df is lpt.trim_df
 
 
 class TestReadInputForExcel:
